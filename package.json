@@ -1,0 +1,41 @@
+{
+  "name": "keywords-highlighter",
+  "version": "0.1.0",
+  "description": "Screen keyword highlighter with OCR",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc && node-gyp rebuild",
+    "dev": "concurrently \"tsc -w\" \"electron-reload . && electron .\"",
+    "start": "electron .",
+    "package": "electron-builder"
+  },
+  "keywords": [
+    "electron",
+    "ocr",
+    "highlighter"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "concurrently": "^8.2.2",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.0.0",
+    "electron-reload": "^2.0.0-alpha.1",
+    "node-gyp": "^10.0.1",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "node-addon-api": "^8.0.0",
+    "sharp": "^0.33.0",
+    "uiohook-napi": "^1.5.5"
+  },
+  "build": {
+    "appId": "com.keywords-highlighter.app",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    }
+  }
+}
