@@ -2,6 +2,7 @@ import { clipboard, desktopCapturer, screen } from 'electron';
 import sharp from 'sharp';
 import * as fs from 'fs';
 import * as path from 'path';
+import { loadNativeModule } from './nativeLoader';
 
 export interface ChangedRegion {
   x: number;
@@ -91,9 +92,9 @@ export class ScreenCapture {
     this.onOptionKeyPressCallback = onOptionKeyPress || null;
 
     try {
-      this.nativeModule = require('../../build/Release/ocr.node');
+      this.nativeModule = loadNativeModule('ocr');
     } catch (error) {
-      console.warn('⚠ Native module not available for window bounds');
+      console.warn('⚠ Native module not available for window bounds:', error);
     }
   }
 

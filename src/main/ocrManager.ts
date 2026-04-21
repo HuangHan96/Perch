@@ -1,11 +1,12 @@
 import { UnderlinePosition } from './overlayManager';
 import * as fs from 'fs';
 import * as path from 'path';
+import { loadNativeModule } from './nativeLoader';
 
 let nativeOCR: any = null;
 
 try {
-  nativeOCR = require('../../build/Release/ocr.node');
+  nativeOCR = loadNativeModule('ocr');
   console.log('✓ Native OCR module loaded, performOCR available:', typeof nativeOCR?.performOCR);
 } catch (error) {
   console.warn('Native OCR module not available, using mock implementation');

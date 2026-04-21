@@ -9,6 +9,9 @@ import { MatchManager } from './matchManager';
 import { KnowledgeStore, SourceContext, AskAgentMessage } from './knowledgeStore';
 import { KnowledgeWindowManager } from './knowledgeWindowManager';
 import { mainI18n } from './i18n';
+import { loadNativeModule } from './nativeLoader';
+// Import logger to initialize logging (must be imported for side effects)
+import './logger';
 
 let screenCapture: ScreenCapture;
 let overlayManager: OverlayManager;
@@ -461,7 +464,7 @@ function isLikelyUrl(value: string): boolean {
 
 function getSelectionSourceContext(): SourceContext | null {
   try {
-    const nativeOCR = require('../../build/Release/ocr.node');
+    const nativeOCR = loadNativeModule('ocr');
     const context = nativeOCR?.getFrontWindowContext?.() as FrontWindowContext | null | undefined;
     if (!context) return null;
 
@@ -526,7 +529,7 @@ function getSelectionProcessingMessage(selection: SelectionClipboardContent | nu
 async function addImageEntry(title: string, imagePath: string, sourceContext?: SourceContext | null) {
   let ocrText = '';
   try {
-    const nativeOCR = require('../../build/Release/ocr.node');
+    const nativeOCR = loadNativeModule('ocr');
     const imageData = fs.readFileSync(imagePath);
     ocrText = await new Promise<string>((resolve) => {
       nativeOCR.performOCR(imageData, [''], (err: any, results: any[]) => {
@@ -665,7 +668,7 @@ function restoreSourceAppFocus(sourceContext: SourceContext | null) {
   if (!bundleId) return;
 
   try {
-    const nativeOCR = require('../../build/Release/ocr.node');
+    const nativeOCR = loadNativeModule('ocr');
     nativeOCR?.activateAppByBundleId?.(bundleId);
   } catch (error) {
     console.warn(`⚠ Failed to restore app focus for ${bundleId}:`, error);

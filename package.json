@@ -38,10 +38,43 @@
   },
   "build": {
     "appId": "com.perch.app",
+    "productName": "Perch",
+    "files": [
+      "dist/**/*",
+      "build/Release/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "build/Release/*.node",
+      "node_modules/**/*.node"
+    ],
+    "extraResources": [
+      {
+        "from": "build/Release",
+        "to": "build/Release",
+        "filter": ["**/*"]
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"],
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   },
   "__npminstall_done": false
