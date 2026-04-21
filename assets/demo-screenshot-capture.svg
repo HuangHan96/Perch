@@ -1,0 +1,87 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @keyframes drawSelection {
+        from { stroke-dashoffset: 400; }
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes slideIn {
+        from { transform: translateX(-20px); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+      }
+      .selection-box { animation: drawSelection 1s ease-out 0.5s both; }
+      .capture-flash { animation: fadeIn 0.3s ease-out 1.8s both; }
+      .saved-card { animation: slideIn 0.6s ease-out 2.2s both; }
+    </style>
+
+    <linearGradient id="screenBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F5F0E8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EDE7DB;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#1A1614"/>
+
+  <!-- Title -->
+  <text x="400" y="40" font-family="Georgia, serif" font-size="24" fill="#F5F0E8" text-anchor="middle" font-weight="600">Drag to Capture Screen Region</text>
+
+  <!-- Screen content -->
+  <rect x="100" y="80" width="600" height="400" rx="12" fill="url(#screenBg)" stroke="#6B5F54" stroke-width="2"/>
+
+  <!-- Sample content on screen -->
+  <g opacity="0.7">
+    <rect x="130" y="110" width="200" height="30" rx="6" fill="#EDE7DB"/>
+    <rect x="130" y="155" width="540" height="80" rx="6" fill="#FEFCF9"/>
+    <text font-family="Arial, sans-serif" font-size="14" fill="#1A1614">
+      <tspan x="150" y="180">Perch automatically extracts keywords</tspan>
+      <tspan x="150" y="200">from your screenshots and saves them</tspan>
+      <tspan x="150" y="220">to your personal knowledge base.</tspan>
+    </text>
+    <rect x="130" y="250" width="540" height="60" rx="6" fill="#FEFCF9"/>
+    <rect x="130" y="325" width="350" height="40" rx="6" fill="#FEFCF9"/>
+  </g>
+
+  <!-- Selection box (animated) -->
+  <rect class="selection-box" x="120" y="145" width="560" height="100" rx="8"
+        fill="rgba(217, 119, 6, 0.1)"
+        stroke="#D97706"
+        stroke-width="3"
+        stroke-dasharray="400"
+        stroke-dashoffset="400"/>
+
+  <!-- Selection handles -->
+  <g class="selection-box">
+    <circle cx="120" cy="145" r="6" fill="#D97706"/>
+    <circle cx="680" cy="145" r="6" fill="#D97706"/>
+    <circle cx="120" cy="245" r="6" fill="#D97706"/>
+    <circle cx="680" cy="245" r="6" fill="#D97706"/>
+  </g>
+
+  <!-- Capture flash effect -->
+  <rect class="capture-flash" x="100" y="80" width="600" height="400" rx="12" fill="#FFFFFF" opacity="0"/>
+
+  <!-- Saved notification card -->
+  <g class="saved-card" filter="url(#shadow)">
+    <rect x="440" y="500" width="340" height="80" rx="12" fill="#FEFCF9" stroke="#D97706" stroke-width="2"/>
+
+    <!-- Success icon -->
+    <circle cx="472" cy="540" r="18" fill="#16A34A" opacity="0.15"/>
+    <path d="M 465 540 L 470 545 L 479 536" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <!-- Text -->
+    <text x="500" y="535" font-family="Arial, sans-serif" font-size="13" fill="#1A1614" font-weight="600">Saved to Knowledge Base</text>
+    <text x="500" y="555" font-family="monospace" font-size="11" fill="#6B5F54">Keywords: Perch, OCR, screenshots</text>
+  </g>
+
+  <!-- Instruction text -->
+  <text x="400" y="510" font-family="Arial, sans-serif" font-size="13" fill="#9B8E82" text-anchor="middle">Hold Option + Drag to select region</text>
+</svg>

@@ -19,6 +19,7 @@
         ],
         "OTHER_LDFLAGS": [
           "-framework Vision",
+          "-framework ApplicationServices",
           "-framework CoreGraphics",
           "-framework Foundation",
           "-framework AppKit"

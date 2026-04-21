@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Perch",
+    "subtitle": "ナレッジベース"
+  },
+  "nav": {
+    "add": "エントリを追加",
+    "browse": "閲覧",
+    "ask": "質問",
+    "keywords": "キーワード",
+    "graph": "グラフ",
+    "settings": "設定"
+  },
+  "add": {
+    "title": "エントリを追加",
+    "description": "テキスト、画像、PDFドキュメントをナレッジベースに追加します。",
+    "modeText": "テキスト",
+    "modeFile": "ファイル",
+    "contentLabel": "コンテンツ",
+    "contentPlaceholder": "ここに知識を貼り付けるか入力してください...",
+    "dropZoneText": "ファイルをここにドロップするかクリックして選択",
+    "buttonAdd": "ナレッジベースに追加",
+    "statusProcessing": "処理中...",
+    "statusSuccess": "✓ 追加成功",
+    "statusError": "✗ 追加失敗"
+  },
+  "browse": {
+    "title": "閲覧",
+    "description": "ナレッジエントリを検索・管理します。",
+    "searchPlaceholder": "エントリを検索...",
+    "filterAll": "すべて",
+    "filterText": "テキスト",
+    "filterWeb": "ウェブ",
+    "filterPdf": "PDF",
+    "filterImage": "画像",
+    "empty": "エントリが見つかりません"
+  },
+  "ask": {
+    "title": "質問",
+    "description": "保存したエントリをコンテキストとしてPerchのAIエージェントと対話します。",
+    "inputPlaceholder": "ノート、ページ、PDF、スクリーンショットについてエージェントに質問...",
+    "hint": "Enterで送信、Shift+Enterで改行。",
+    "buttonSend": "送信",
+    "buttonClear": "チャットをクリア",
+    "emptyState": "ナレッジベース内の任意の内容について質問してください。エージェントは関連エントリを検索し、ソースに基づいた回答を提供します。",
+    "sources": "ソース",
+    "showSources": "表示",
+    "hideSources": "非表示"
+  },
+  "keywords": {
+    "title": "キーワード",
+    "description": "ドキュメントから自動抽出された概念。",
+    "searchPlaceholder": "キーワードを検索...",
+    "docCount": "{{count}}件のドキュメント",
+    "empty": "キーワードが見つかりません"
+  },
+  "graph": {
+    "title": "ナレッジグラフ",
+    "description": "キーワードとドキュメント間の視覚的な接続。"
+  },
+  "settings": {
+    "title": "設定",
+    "description": "PerchのAIエージェントおよび他のLLM駆動タスクで使用するモデルを設定します。",
+    "endpointLabel": "エンドポイント",
+    "endpointPlaceholder": "http://127.0.0.1:1234/v1",
+    "modelLabel": "モデル",
+    "modelPlaceholder": "qwen3.5-4b",
+    "embeddingModelLabel": "埋め込みモデル",
+    "embeddingModelPlaceholder": "text-embedding-nomic-embed-text-v1.5",
+    "languageLabel": "言語",
+    "buttonRefreshModels": "モデルを更新",
+    "buttonSave": "設定を保存",
+    "helpText": "エンドポイントはOpenAI互換である必要があります。<code>/chat/completions</code>と<code>/embeddings</code>の両方に使用されます。ホストとポートのみを入力した場合、アプリは自動的に<code>/v1</code>ベースURLに正規化します。",
+    "statusSaving": "保存中...",
+    "statusSuccess": "✓ 設定を保存しました",
+    "statusSuccessReloading": "✓ 設定を保存しました。再読み込み中...",
+    "statusError": "✗ 設定の保存に失敗しました"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "success": "成功",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "delete": "削除",
+    "edit": "編集",
+    "save": "保存"
+  },
+  "overlay": {
+    "captureText": "テキストをキャプチャ",
+    "captureFile": "ファイルをキャプチャ",
+    "captureImage": "画像をキャプチャ",
+    "captureWeb": "ウェブをキャプチャ",
+    "processing": "処理中",
+    "saved": "保存しました",
+    "failed": "失敗",
+    "savingContent": "コンテンツを保存してインデックスを構築中...",
+    "captureProcessingFailed": "キャプチャ処理に失敗しました",
+    "screenshotProcessingFailed": "スクリーンショット処理に失敗しました"
+  }
+}

@@ -1,10 +1,10 @@
 {
-  "name": "keywords-highlighter",
+  "name": "perch",
   "version": "0.1.0",
-  "description": "Screen keyword highlighter with OCR",
+  "description": "Perch - Intelligent screen capture and knowledge management",
   "main": "dist/main/index.js",
   "scripts": {
-    "build": "tsc && node-gyp rebuild",
+    "build": "tsc && tsc -p src/renderer/tsconfig.json && mkdir -p dist/renderer dist/locales && cp src/renderer/*.html src/renderer/*.css dist/renderer/ && cp src/locales/*.json dist/locales/ && node-gyp rebuild",
     "dev": "concurrently \"tsc -w\" \"electron-reload . && electron .\"",
     "start": "electron .",
     "package": "electron-builder"
@@ -12,11 +12,13 @@
   "keywords": [
     "electron",
     "ocr",
-    "highlighter"
+    "knowledge",
+    "capture"
   ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.0",
     "concurrently": "^8.2.2",
     "electron": "^33.4.11",
@@ -26,16 +28,21 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
+    "@types/d3": "^7.4.3",
+    "better-sqlite3": "^12.9.0",
+    "d3": "^7.9.0",
     "node-addon-api": "^8.0.0",
+    "pdf-parse": "^2.4.5",
     "sharp": "^0.33.0",
     "uiohook-napi": "^1.5.5"
   },
   "build": {
-    "appId": "com.keywords-highlighter.app",
+    "appId": "com.perch.app",
     "mac": {
       "category": "public.app-category.utilities",
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
     }
-  }
+  },
+  "__npminstall_done": false
 }

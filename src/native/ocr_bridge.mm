@@ -1,7 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <Vision/Vision.h>
 #import <AppKit/AppKit.h>
+#import <ApplicationServices/ApplicationServices.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <unistd.h>
 #import <napi.h>
 
 // Helper function to perform OCR using Vision API
@@ -22,7 +24,7 @@ NSArray* performOCROnImage(NSData* imageData, NSArray* keywords) {
 
         // Create Vision request with optimized settings for speed
         VNRecognizeTextRequest* request = [[VNRecognizeTextRequest alloc] init];
-        request.recognitionLevel = VNRequestTextRecognitionLevelFast;
+        request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
         request.usesLanguageCorrection = NO;
         request.minimumTextHeight = 0.0;
 
@@ -268,7 +270,7 @@ Napi::Value GetFrontWindowBounds(const Napi::CallbackInfo& info) {
                     NSString* name = (__bridge NSString*)nameRef;
 
                     // Skip our own overlay window
-                    if (name && ([name containsString:@"Overlay"] || [name containsString:@"keywords-highlighter"])) {
+                    if (name && ([name containsString:@"Overlay"] || [name containsString:@"Perch"])) {
                         continue;
                     }
 
@@ -292,9 +294,147 @@ Napi::Value GetFrontWindowBounds(const Napi::CallbackInfo& info) {
     return env.Null();
 }
 
+Napi::Value GetFrontWindowContext(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    @autoreleasepool {
+        CFArrayRef windowList = CGWindowListCopyWindowInfo(
+            kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
+            kCGNullWindowID
+        );
+
+        if (windowList) {
+            CFIndex count = CFArrayGetCount(windowList);
+
+            for (CFIndex i = 0; i < count; i++) {
+                CFDictionaryRef window = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+
+                CFNumberRef layerRef = (CFNumberRef)CFDictionaryGetValue(window, kCGWindowLayer);
+                int layer = 0;
+                if (layerRef) {
+                    CFNumberGetValue(layerRef, kCFNumberIntType, &layer);
+                }
+                if (layer != 0) continue;
+
+                CFStringRef ownerNameRef = (CFStringRef)CFDictionaryGetValue(window, kCGWindowOwnerName);
+                NSString* ownerName = (__bridge NSString*)ownerNameRef;
+
+                CFStringRef windowNameRef = (CFStringRef)CFDictionaryGetValue(window, kCGWindowName);
+                NSString* windowTitle = (__bridge NSString*)windowNameRef;
+
+                NSString* combinedName = [NSString stringWithFormat:@"%@ %@", ownerName ?: @"", windowTitle ?: @""];
+                if ([combinedName localizedCaseInsensitiveContainsString:@"Perch"]) {
+                    continue;
+                }
+
+                CFNumberRef pidRef = (CFNumberRef)CFDictionaryGetValue(window, kCGWindowOwnerPID);
+                pid_t pid = 0;
+                if (pidRef) {
+                    CFNumberGetValue(pidRef, kCFNumberIntType, &pid);
+                }
+
+                NSRunningApplication* app = pid > 0 ? [NSRunningApplication runningApplicationWithProcessIdentifier:pid] : nil;
+                NSString* appName = app.localizedName ?: ownerName ?: @"";
+                NSString* bundleId = app.bundleIdentifier ?: @"";
+
+                Napi::Object result = Napi::Object::New(env);
+                result.Set("appName", Napi::String::New(env, [appName UTF8String]));
+                result.Set("bundleId", Napi::String::New(env, [bundleId UTF8String]));
+                result.Set("windowTitle", Napi::String::New(env, [(windowTitle ?: @"") UTF8String]));
+
+                CFRelease(windowList);
+                return result;
+            }
+
+            CFRelease(windowList);
+        }
+    }
+
+    return env.Null();
+}
+
+Napi::Value SimulateCopyShortcut(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    @autoreleasepool {
+        CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState);
+        if (!source) {
+            return Napi::Boolean::New(env, false);
+        }
+
+        CGEventRef commandDown = CGEventCreateKeyboardEvent(source, (CGKeyCode)55, true);
+        CGEventRef cDown = CGEventCreateKeyboardEvent(source, (CGKeyCode)8, true);
+        CGEventRef cUp = CGEventCreateKeyboardEvent(source, (CGKeyCode)8, false);
+        CGEventRef commandUp = CGEventCreateKeyboardEvent(source, (CGKeyCode)55, false);
+
+        if (!commandDown || !cDown || !cUp || !commandUp) {
+            if (commandDown) CFRelease(commandDown);
+            if (cDown) CFRelease(cDown);
+            if (cUp) CFRelease(cUp);
+            if (commandUp) CFRelease(commandUp);
+            CFRelease(source);
+            return Napi::Boolean::New(env, false);
+        }
+
+        CGEventSetFlags(cDown, kCGEventFlagMaskCommand);
+        CGEventSetFlags(cUp, kCGEventFlagMaskCommand);
+
+        CGEventPost(kCGHIDEventTap, commandDown);
+        usleep(1000 * 10);
+        CGEventPost(kCGHIDEventTap, cDown);
+        usleep(1000 * 10);
+        CGEventPost(kCGHIDEventTap, cUp);
+        usleep(1000 * 10);
+        CGEventPost(kCGHIDEventTap, commandUp);
+
+        CFRelease(commandDown);
+        CFRelease(cDown);
+        CFRelease(cUp);
+        CFRelease(commandUp);
+        CFRelease(source);
+    }
+
+    return Napi::Boolean::New(env, true);
+}
+
+Napi::Value ActivateAppByBundleId(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 1 || !info[0].IsString()) {
+        Napi::TypeError::New(env, "Expected (bundleId: string)").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    std::string bundleIdValue = info[0].As<Napi::String>().Utf8Value();
+    if (bundleIdValue.empty()) {
+        return Napi::Boolean::New(env, false);
+    }
+
+    @autoreleasepool {
+        NSString* bundleId = [NSString stringWithUTF8String:bundleIdValue.c_str()];
+        NSArray<NSRunningApplication*>* apps = [NSRunningApplication runningApplicationsWithBundleIdentifier:bundleId];
+        for (NSRunningApplication* app in apps) {
+            if (!app || app.terminated) continue;
+            if (app.processIdentifier == [[NSRunningApplication currentApplication] processIdentifier]) {
+                continue;
+            }
+
+            BOOL activated = [app activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+            if (activated) {
+                return Napi::Boolean::New(env, true);
+            }
+        }
+    }
+
+    return Napi::Boolean::New(env, false);
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("performOCR", Napi::Function::New(env, PerformOCR));
     exports.Set("getFrontWindowBounds", Napi::Function::New(env, GetFrontWindowBounds));
+    exports.Set("getFrontWindowContext", Napi::Function::New(env, GetFrontWindowContext));
+    exports.Set("simulateCopyShortcut", Napi::Function::New(env, SimulateCopyShortcut));
+    exports.Set("activateAppByBundleId", Napi::Function::New(env, ActivateAppByBundleId));
     return exports;
 }
 

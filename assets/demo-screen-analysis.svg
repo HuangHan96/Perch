@@ -1,0 +1,58 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      @keyframes underline {
+        from { stroke-dashoffset: 100; }
+        to { stroke-dashoffset: 0; }
+      }
+      .screen { animation: fadeIn 0.5s ease-out; }
+      .key { animation: slideUp 0.6s ease-out 0.5s both; }
+      .underline-1 { animation: underline 0.8s ease-out 1.5s both; }
+      .underline-2 { animation: underline 0.8s ease-out 1.8s both; }
+      .underline-3 { animation: underline 0.8s ease-out 2.1s both; }
+    </style>
+
+    <linearGradient id="screenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F5F0E8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EDE7DB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#1A1614"/>
+
+  <!-- Screen mockup -->
+  <g class="screen">
+    <rect x="100" y="80" width="600" height="400" rx="12" fill="url(#screenGradient)" stroke="#6B5F54" stroke-width="2"/>
+
+    <!-- Sample text content -->
+    <text font-family="Arial, sans-serif" font-size="16" fill="#1A1614">
+      <tspan x="130" y="130">Perch uses advanced OCR technology to</tspan>
+      <tspan x="130" y="160">analyze your screen in real-time. Simply</tspan>
+      <tspan x="130" y="190">hold the Option key to activate screen</tspan>
+      <tspan x="130" y="220">analysis and see keywords highlighted.</tspan>
+    </text>
+
+    <!-- Underlines for keywords -->
+    <line class="underline-1" x1="130" y1="135" x2="195" y2="135" stroke="#D97706" stroke-width="2.5" stroke-dasharray="65" stroke-dashoffset="65" stroke-linecap="round"/>
+    <line class="underline-2" x1="230" y1="165" x2="270" y2="165" stroke="#D97706" stroke-width="2.5" stroke-dasharray="40" stroke-dashoffset="40" stroke-linecap="round"/>
+    <line class="underline-3" x1="130" y1="225" x2="230" y2="225" stroke="#D97706" stroke-width="2.5" stroke-dasharray="100" stroke-dashoffset="100" stroke-linecap="round"/>
+  </g>
+
+  <!-- Option key indicator -->
+  <g class="key">
+    <rect x="340" y="500" width="120" height="60" rx="8" fill="#FEFCF9" stroke="#D97706" stroke-width="3"/>
+    <text x="400" y="538" font-family="Arial, sans-serif" font-size="20" fill="#1A1614" text-anchor="middle" font-weight="600">⌥ Option</text>
+  </g>
+
+  <!-- Title -->
+  <text x="400" y="40" font-family="Georgia, serif" font-size="24" fill="#F5F0E8" text-anchor="middle" font-weight="600">Hold Option to Analyze Screen</text>
+</svg>

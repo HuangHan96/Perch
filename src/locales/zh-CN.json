@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Perch",
+    "subtitle": "知识库"
+  },
+  "nav": {
+    "add": "添加条目",
+    "browse": "浏览",
+    "ask": "提问",
+    "keywords": "关键词",
+    "graph": "知识图谱",
+    "settings": "设置"
+  },
+  "add": {
+    "title": "添加条目",
+    "description": "添加文本、图片或 PDF 文档到你的知识库。",
+    "modeText": "文本",
+    "modeFile": "文件",
+    "contentLabel": "内容",
+    "contentPlaceholder": "在此粘贴或输入你的知识...",
+    "dropZoneText": "拖放文件到此处或点击选择",
+    "buttonAdd": "添加到知识库",
+    "statusProcessing": "处理中...",
+    "statusSuccess": "✓ 添加成功",
+    "statusError": "✗ 添加失败"
+  },
+  "browse": {
+    "title": "浏览",
+    "description": "搜索和管理你的知识条目。",
+    "searchPlaceholder": "搜索条目...",
+    "filterAll": "全部",
+    "filterText": "文本",
+    "filterWeb": "网页",
+    "filterPdf": "PDF",
+    "filterImage": "图片",
+    "empty": "未找到条目"
+  },
+  "ask": {
+    "title": "提问",
+    "description": "与 Perch 的 AI 助手对话，使用你保存的条目作为上下文。",
+    "inputPlaceholder": "向助手询问你的笔记、网页、PDF 和截图...",
+    "hint": "回车发送，Shift+回车换行。",
+    "buttonSend": "发送",
+    "buttonClear": "清空对话",
+    "emptyState": "询问知识库中的任何内容。助手会先检索相关条目，然后基于来源提供答案。",
+    "sources": "来源",
+    "showSources": "显示",
+    "hideSources": "隐藏"
+  },
+  "keywords": {
+    "title": "关键词",
+    "description": "从你的文档中自动提取的概念。",
+    "searchPlaceholder": "搜索关键词...",
+    "docCount": "{{count}} 个文档",
+    "empty": "未找到关键词"
+  },
+  "graph": {
+    "title": "知识图谱",
+    "description": "关键词和文档之间的可视化连接。"
+  },
+  "settings": {
+    "title": "设置",
+    "description": "配置 Perch 的 AI 助手和其他 LLM 驱动任务使用的模型。",
+    "endpointLabel": "端点",
+    "endpointPlaceholder": "http://127.0.0.1:1234/v1",
+    "modelLabel": "模型",
+    "modelPlaceholder": "qwen3.5-4b",
+    "embeddingModelLabel": "嵌入模型",
+    "embeddingModelPlaceholder": "text-embedding-nomic-embed-text-v1.5",
+    "languageLabel": "语言",
+    "buttonRefreshModels": "刷新模型",
+    "buttonSave": "保存设置",
+    "helpText": "端点必须兼容 OpenAI API。它用于 <code>/chat/completions</code> 和 <code>/embeddings</code>。如果你只输入主机和端口，应用会自动规范化为 <code>/v1</code> 基础 URL。",
+    "statusSaving": "保存中...",
+    "statusSuccess": "✓ 设置已保存",
+    "statusSuccessReloading": "✓ 设置已保存。重新加载中...",
+    "statusError": "✗ 保存设置失败"
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "save": "保存"
+  },
+  "overlay": {
+    "captureText": "摘抄文本",
+    "captureFile": "摘抄文件",
+    "captureImage": "摘抄图片",
+    "captureWeb": "摘抄网页",
+    "processing": "处理中",
+    "saved": "已保存",
+    "failed": "失败",
+    "savingContent": "正在保存内容并建立索引…",
+    "captureProcessingFailed": "摘抄处理失败",
+    "screenshotProcessingFailed": "截图处理失败"
+  }
+}

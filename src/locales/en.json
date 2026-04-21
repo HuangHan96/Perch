@@ -1,0 +1,101 @@
+{
+  "app": {
+    "name": "Perch",
+    "subtitle": "Knowledge Base"
+  },
+  "nav": {
+    "add": "Add Entry",
+    "browse": "Browse",
+    "ask": "Ask",
+    "keywords": "Keywords",
+    "graph": "Graph",
+    "settings": "Settings"
+  },
+  "add": {
+    "title": "Add Entry",
+    "description": "Add text, images, or PDF documents to your knowledge base.",
+    "modeText": "Text",
+    "modeFile": "File",
+    "contentLabel": "Content",
+    "contentPlaceholder": "Paste or type your knowledge here...",
+    "dropZoneText": "Drop a file here or click to select",
+    "buttonAdd": "Add to Knowledge Base",
+    "statusProcessing": "Processing...",
+    "statusSuccess": "✓ Added successfully",
+    "statusError": "✗ Failed to add"
+  },
+  "browse": {
+    "title": "Browse",
+    "description": "Search and manage your knowledge entries.",
+    "searchPlaceholder": "Search entries...",
+    "filterAll": "All",
+    "filterText": "Text",
+    "filterWeb": "Web",
+    "filterPdf": "PDF",
+    "filterImage": "Image",
+    "empty": "No entries found"
+  },
+  "ask": {
+    "title": "Ask",
+    "description": "Talk to Perch's AI agent with your saved entries as context.",
+    "inputPlaceholder": "Ask the agent about your notes, pages, PDFs, and screenshots...",
+    "hint": "Enter to send, Shift+Enter for a new line.",
+    "buttonSend": "Send",
+    "buttonClear": "Clear Chat",
+    "emptyState": "Ask about anything in your knowledge base. The agent will retrieve related entries first, then answer with source-backed context.",
+    "sources": "Sources",
+    "showSources": "Show",
+    "hideSources": "Hide"
+  },
+  "keywords": {
+    "title": "Keywords",
+    "description": "Automatically extracted concepts from your documents.",
+    "searchPlaceholder": "Search keywords...",
+    "docCount": "{{count}} documents",
+    "empty": "No keywords found"
+  },
+  "graph": {
+    "title": "Knowledge Graph",
+    "description": "Visual connections between keywords and documents."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Configure the model used by Perch's AI agent and other LLM-powered tasks.",
+    "endpointLabel": "Endpoint",
+    "endpointPlaceholder": "http://127.0.0.1:1234/v1",
+    "modelLabel": "Model",
+    "modelPlaceholder": "qwen3.5-4b",
+    "embeddingModelLabel": "Embedding Model",
+    "embeddingModelPlaceholder": "text-embedding-nomic-embed-text-v1.5",
+    "languageLabel": "Language",
+    "buttonRefreshModels": "Refresh Models",
+    "buttonSave": "Save Settings",
+    "helpText": "The endpoint must be OpenAI-compatible. It is used for both <code>/chat/completions</code> and <code>/embeddings</code>. If you enter only host and port, the app will normalize it to a <code>/v1</code> base URL automatically.",
+    "statusSaving": "Saving...",
+    "statusSuccess": "✓ Settings saved",
+    "statusSuccessReloading": "✓ Settings saved. Reloading...",
+    "statusError": "✗ Failed to save settings"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save"
+  },
+  "overlay": {
+    "captureText": "Capture Text",
+    "captureFile": "Capture File",
+    "captureImage": "Capture Image",
+    "captureWeb": "Capture Web",
+    "processing": "Processing",
+    "saved": "Saved",
+    "failed": "Failed",
+    "savingContent": "Saving content and building index...",
+    "captureProcessingFailed": "Capture processing failed",
+    "screenshotProcessingFailed": "Screenshot processing failed"
+  }
+}

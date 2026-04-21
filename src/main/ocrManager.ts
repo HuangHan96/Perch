@@ -6,6 +6,7 @@ let nativeOCR: any = null;
 
 try {
   nativeOCR = require('../../build/Release/ocr.node');
+  console.log('✓ Native OCR module loaded, performOCR available:', typeof nativeOCR?.performOCR);
 } catch (error) {
   console.warn('Native OCR module not available, using mock implementation');
 }
@@ -54,6 +55,10 @@ export class OCRManager {
     }
   }
 
+  setKeywordsInMemory(keywords: string[]) {
+    this.keywords = keywords;
+  }
+
   async findKeywordMatches(
     imageBuffer: Buffer,
     displayBounds: { width: number; height: number; menuBarHeight: number },
@@ -65,12 +70,13 @@ export class OCRManager {
     }
 
     if (!nativeOCR || !nativeOCR.performOCR) {
+      console.warn('⚠ Native OCR not available in findKeywordMatches');
       return [];
     }
 
     try {
       const startTime = performance.now();
-      console.log(`→ OCR Manager: Processing ${imageBuffer.length} bytes`);
+      console.log(`→ OCR Manager: Processing ${imageBuffer.length} bytes with keywords: ${this.keywords.join(', ')}`);
 
       const ocrResults: OCRResult[] = await new Promise<OCRResult[]>((resolve, reject) => {
         nativeOCR.performOCR(imageBuffer, this.keywords, (err: Error | null, results: OCRResult[]) => {
@@ -78,6 +84,7 @@ export class OCRManager {
             console.error('✗ Native OCR error:', err);
             reject(err);
           } else {
+            console.log(`→ Native OCR returned ${results?.length || 0} results`);
             resolve(results || []);
           }
         });

@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Perch</title>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #F5F0E8;
+      --bg-secondary: #EDE7DB;
+      --bg-tertiary: #E5DDD0;
+      --bg-card: #FEFCF9;
+      --bg-input: #FFFEF9;
+      --text-primary: #1A1614;
+      --text-secondary: #6B5F54;
+      --text-tertiary: #9B8E82;
+      --accent: #D97706;
+      --accent-hover: #B45309;
+      --accent-soft: rgba(217, 119, 6, 0.08);
+      --border: rgba(26, 22, 20, 0.08);
+      --border-strong: rgba(26, 22, 20, 0.15);
+      --success: #16A34A;
+      --error: #DC2626;
+      --tag-bg: rgba(26, 22, 20, 0.05);
+      --shadow-sm: 0 1px 2px rgba(26, 22, 20, 0.04);
+      --shadow-md: 0 4px 12px rgba(26, 22, 20, 0.06);
+      --shadow-lg: 0 8px 24px rgba(26, 22, 20, 0.08);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* --- Layout --- */
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 200px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-header .subtitle {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .nav {
+      padding: 12px 8px;
+      flex: 1;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      font-family: inherit;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+    .nav-item.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+      font-weight: 500;
+    }
+
+    .nav-icon { font-size: 16px; opacity: 0.7; width: 20px; text-align: center; }
+    .nav-item.active .nav-icon { opacity: 1; }
+
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 36px;
+    }
+
+    /* --- Panel headers --- */
+    .panel { display: none; animation: fadeIn 0.2s; }
+    .panel.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .panel-title {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .panel-desc {
+      font-size: 13.5px;
+      color: var(--text-tertiary);
+      margin-bottom: 28px;
+      line-height: 1.5;
+    }
+
+    /* --- Add Panel --- */
+    .mode-switch {
+      display: inline-flex;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+      padding: 3px;
+      margin-bottom: 20px;
+    }
+
+    .mode-btn {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .mode-btn.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-sm);
+      font-weight: 500;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      height: 160px;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+
+    textarea:focus { outline: none; border-color: var(--accent); }
+    textarea::placeholder { color: var(--text-tertiary); }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 48px 24px;
+      text-align: center;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg-input);
+      margin-top: 4px;
+    }
+
+    .drop-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .drop-zone.dragover { border-color: var(--accent); background: var(--accent-soft); }
+    .drop-zone img { max-width: 100%; max-height: 180px; border-radius: var(--radius-sm); margin-top: 12px; }
+    .drop-zone-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.4; }
+    .drop-zone-text { font-size: 13px; }
+
+    .btn {
+      padding: 10px 22px;
+      border-radius: var(--radius-sm);
+      border: none;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      margin-top: 20px;
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--bg-primary);
+    }
+
+    .btn-primary:hover { background: #332C28; }
+
+    .btn-danger {
+      background: transparent;
+      color: var(--error);
+      border: 1px solid rgba(220, 38, 38, 0.2);
+      padding: 5px 12px;
+      font-size: 12px;
+      margin: 0;
+    }
+
+    .btn-danger:hover { background: rgba(220, 38, 38, 0.05); }
+
+    .status {
+      font-size: 12px;
+      margin-top: 12px;
+      min-height: 18px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status.processing { color: var(--accent); }
+    .status.success { color: var(--success); }
+    .status.error { color: var(--error); }
+
+    /* --- Browse --- */
+    .search-box {
+      display: block;
+      width: 100%;
+      padding: 11px 16px 11px 40px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%239B8E82' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cpath d='M10.5 10.5L14 14'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: 14px center;
+      background-size: 16px 16px;
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      transition: border-color 0.15s;
+    }
+
+    .search-box:focus { outline: none; border-color: var(--accent); }
+    .search-box::placeholder { color: var(--text-tertiary); }
+
+    .search-wrap {
+      flex: 1;
+      margin-bottom: 20px;
+    }
+
+    .browse-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .browse-toolbar .search-wrap {
+      margin-bottom: 0;
+    }
+
+    .refresh-btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      min-width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .refresh-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+      background: var(--bg-secondary);
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .filter-btn {
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+
+    .filter-btn.active {
+      background: var(--text-primary);
+      border-color: var(--text-primary);
+      color: var(--bg-primary);
+    }
+
+    .entry-list { display: flex; flex-direction: column; gap: 8px; }
+
+    #browse.active {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 64px);
+    }
+
+    #browse .panel-title,
+    #browse .panel-desc,
+    #browse .browse-toolbar,
+    #browse .filter-row {
+      flex-shrink: 0;
+    }
+
+    #browse .entry-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .entry-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      transition: box-shadow 0.15s, transform 0.15s, border-color 0.15s;
+      cursor: pointer;
+    }
+
+    .entry-item:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--border-strong); }
+
+    .entry-icon {
+      font-size: 18px;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      background: var(--tag-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .entry-favicon {
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      border-radius: 4px;
+      display: block;
+    }
+
+    .entry-info { flex: 1; min-width: 0; }
+
+    .entry-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .entry-meta {
+      font-size: 11.5px;
+      color: var(--text-tertiary);
+      margin-top: 3px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .entry-source {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 5px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+
+    .entry-tags { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .tag {
+      display: inline-block;
+      background: var(--tag-bg);
+      color: var(--text-secondary);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    /* --- Keywords --- */
+    .keyword-item {
+      padding: 16px 18px;
+      border-radius: var(--radius-md);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      margin-bottom: 8px;
+      transition: box-shadow 0.15s;
+    }
+
+    .keyword-item:hover { box-shadow: var(--shadow-md); }
+
+    .keyword-name {
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .keyword-meta {
+      font-size: 11.5px;
+      color: var(--text-tertiary);
+      margin-top: 3px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .keyword-desc {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin-top: 10px;
+      line-height: 1.6;
+      border-left: 2px solid var(--accent);
+      padding-left: 12px;
+    }
+
+    /* --- Graph --- */
+    #graph-svg {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    #graph.active { display: flex; flex-direction: column; height: calc(100vh - 64px); }
+    #graph .panel-title, #graph .panel-desc { flex-shrink: 0; }
+    #graph-svg { flex: 1; min-height: 0; }
+
+    /* --- Ask --- */
+    #ask.active {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 64px);
+    }
+
+    #ask .ask-header,
+    #ask .ask-composer {
+      flex-shrink: 0;
+    }
+
+    .ask-header {
+      margin-bottom: 14px;
+    }
+
+    .ask-header.hidden {
+      display: none;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      margin-top: 0;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .ask-thread {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 4px;
+      margin-bottom: 18px;
+    }
+
+    .ask-empty {
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius-lg);
+      background: rgba(254, 252, 249, 0.6);
+      padding: 28px 24px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .ask-message {
+      max-width: min(760px, 88%);
+      border-radius: 18px;
+      padding: 14px 16px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .ask-message.user {
+      align-self: flex-end;
+      background: var(--text-primary);
+      color: var(--bg-primary);
+      border-color: var(--text-primary);
+    }
+
+    .ask-message.assistant {
+      align-self: flex-start;
+      background: var(--bg-card);
+    }
+
+    .ask-role {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 8px;
+    }
+
+    .ask-content {
+      font-size: 14px;
+      line-height: 1.7;
+      word-break: break-word;
+    }
+
+    .ask-content > :first-child { margin-top: 0; }
+    .ask-content > :last-child { margin-bottom: 0; }
+    .ask-content p { margin: 0 0 0.9em; }
+    .ask-content ul, .ask-content ol { margin: 0 0 0.9em 1.25em; }
+    .ask-content li { margin: 0.22em 0; }
+    .ask-content blockquote {
+      margin: 0 0 0.9em;
+      padding-left: 12px;
+      border-left: 3px solid var(--accent);
+      color: var(--text-secondary);
+    }
+    .ask-content pre {
+      margin: 0 0 0.9em;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      background: #1C1917;
+      color: #F8FAFC;
+      overflow: auto;
+    }
+    .ask-content code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .ask-content :not(pre) > code {
+      background: var(--bg-secondary);
+      padding: 0.12em 0.35em;
+      border-radius: 6px;
+    }
+    .ask-content a {
+      color: var(--accent-hover);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(180, 83, 9, 0.25);
+    }
+    .ask-content a:hover {
+      border-bottom-color: rgba(180, 83, 9, 0.7);
+    }
+
+    .ask-cite {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 999px;
+      border: 1px solid rgba(180, 83, 9, 0.2);
+      background: rgba(217, 119, 6, 0.09);
+      color: var(--accent-hover);
+      font-size: 10px;
+      font-weight: 600;
+      text-decoration: none;
+      vertical-align: super;
+      position: relative;
+      top: -0.35em;
+      margin-left: 2px;
+      line-height: 1;
+    }
+
+    .ask-cite:hover {
+      background: rgba(217, 119, 6, 0.16);
+      border-color: rgba(180, 83, 9, 0.35);
+    }
+
+    .ask-sources {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ask-sources-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .ask-sources-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-tertiary);
+      margin-bottom: 0;
+    }
+
+    .ask-sources-toggle {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .ask-sources-toggle:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+      background: var(--bg-tertiary);
+    }
+
+    .ask-sources.collapsed .ask-source-list {
+      display: none;
+    }
+
+    .ask-source-list {
+      list-style: decimal;
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ask-source-item {
+      color: var(--text-secondary);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .ask-source-button {
+      appearance: none;
+      border: none;
+      background: none;
+      padding: 0;
+      margin: 0;
+      color: var(--text-primary);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .ask-source-button:hover {
+      color: var(--accent-hover);
+    }
+
+    .ask-source-meta {
+      display: block;
+      margin-top: 2px;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .ask-source-excerpt {
+      display: block;
+      margin-top: 4px;
+    }
+
+    .ask-composer {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      background: var(--bg-card);
+      padding: 10px 12px 12px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ask-input {
+      width: 100%;
+      min-height: 40px;
+      height: 40px;
+      max-height: 76px;
+      border: none;
+      background: transparent;
+      resize: none;
+      padding: 2px 0 0;
+      margin: 0;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    .ask-input:focus {
+      outline: none;
+      border: none;
+    }
+
+    .ask-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .ask-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ask-composer .btn {
+      margin-top: 0;
+      height: 36px;
+      padding: 0 16px;
+    }
+
+    .ask-composer .btn-secondary {
+      min-width: 92px;
+    }
+
+    .ask-composer .btn-primary {
+      min-width: 84px;
+    }
+
+    .ask-hint {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      line-height: 1.4;
+    }
+
+    .ask-status {
+      min-height: 18px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-tertiary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-tertiary);
+      font-size: 14px;
+    }
+
+    .empty-state-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+
+    /* --- Settings --- */
+    .settings-card {
+      max-width: 640px;
+      padding: 22px 24px;
+      border-radius: var(--radius-lg);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .settings-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .settings-help {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .settings-input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      transition: border-color 0.15s;
+    }
+
+    .settings-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .settings-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 2px;
+    }
+
+    .settings-model-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .settings-model-row .settings-input {
+      flex: 1;
+    }
+
+    .settings-model-refresh {
+      flex-shrink: 0;
+      margin-top: 0;
+      padding: 0 14px;
+      height: 42px;
+    }
+
+    .settings-meta {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <h1 data-i18n="app.name">Perch</h1>
+        <div class="subtitle" data-i18n="app.subtitle">Knowledge Base</div>
+      </div>
+      <div class="nav">
+        <button class="nav-item" data-tab="add">
+          <span class="nav-icon">+</span> <span data-i18n="nav.add">Add Entry</span>
+        </button>
+        <button class="nav-item active" data-tab="browse">
+          <span class="nav-icon">☰</span> <span data-i18n="nav.browse">Browse</span>
+        </button>
+        <button class="nav-item" data-tab="ask">
+          <span class="nav-icon">✦</span> <span data-i18n="nav.ask">Ask</span>
+        </button>
+        <button class="nav-item" data-tab="keywords">
+          <span class="nav-icon">◈</span> <span data-i18n="nav.keywords">Keywords</span>
+        </button>
+        <button class="nav-item" data-tab="graph">
+          <span class="nav-icon">⬡</span> <span data-i18n="nav.graph">Graph</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="nav-icon">⚙</span> <span data-i18n="nav.settings">Settings</span>
+        </button>
+      </div>
+    </nav>
+
+    <div class="main">
+      <div id="add" class="panel">
+        <div class="panel-title" data-i18n="add.title">Add Entry</div>
+        <div class="panel-desc" data-i18n="add.description">Add text, images, or PDF documents to your knowledge base.</div>
+
+        <div class="mode-switch">
+          <button class="mode-btn active" data-mode="text" data-i18n="add.modeText">Text</button>
+          <button class="mode-btn" data-mode="file" data-i18n="add.modeFile">File</button>
+        </div>
+
+        <div id="text-input">
+          <label data-i18n="add.contentLabel">Content</label>
+          <textarea id="text-content" data-i18n-placeholder="add.contentPlaceholder" placeholder="Paste or type your knowledge here..."></textarea>
+        </div>
+
+        <div id="file-input" style="display:none;">
+          <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-icon">↑</div>
+            <div class="drop-zone-text" data-i18n="add.dropZoneText">Drop a file here or click to select</div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-add" data-i18n="add.buttonAdd">Add to Knowledge Base</button>
+        <div class="status" id="add-status"></div>
+      </div>
+
+      <div id="browse" class="panel active">
+        <div class="panel-title" data-i18n="browse.title">Browse</div>
+        <div class="panel-desc" data-i18n="browse.description">Search and manage your knowledge entries.</div>
+        <div class="browse-toolbar">
+          <div class="search-wrap">
+            <input type="text" class="search-box" id="search-box" data-i18n-placeholder="browse.searchPlaceholder" placeholder="Search entries...">
+          </div>
+          <button class="refresh-btn" id="browse-refresh-btn" type="button" title="Refresh">↻</button>
+        </div>
+        <div class="filter-row" id="entry-filter-row">
+          <button class="filter-btn active" data-entry-type="all" type="button" data-i18n="browse.filterAll">All</button>
+          <button class="filter-btn" data-entry-type="text" type="button" data-i18n="browse.filterText">Text</button>
+          <button class="filter-btn" data-entry-type="web" type="button" data-i18n="browse.filterWeb">Web</button>
+          <button class="filter-btn" data-entry-type="pdf" type="button" data-i18n="browse.filterPdf">PDF</button>
+          <button class="filter-btn" data-entry-type="image" type="button" data-i18n="browse.filterImage">Image</button>
+        </div>
+        <div class="entry-list" id="entry-list"></div>
+      </div>
+
+      <div id="keywords" class="panel">
+        <div class="panel-title" data-i18n="keywords.title">Keywords</div>
+        <div class="panel-desc" data-i18n="keywords.description">Automatically extracted concepts from your documents.</div>
+        <div class="search-wrap">
+          <input type="text" class="search-box" id="keyword-search-box" data-i18n-placeholder="keywords.searchPlaceholder" placeholder="Search keywords...">
+        </div>
+        <div id="keyword-list"></div>
+      </div>
+
+      <div id="ask" class="panel">
+        <div class="ask-header" id="ask-header">
+          <div class="panel-title" data-i18n="ask.title">Ask</div>
+          <div class="panel-desc" data-i18n="ask.description">Talk to Perch's AI agent with your saved entries as context.</div>
+        </div>
+        <div class="ask-thread" id="ask-thread">
+          <div class="ask-empty" data-i18n="ask.emptyState">
+            Ask about anything in your knowledge base. The agent will retrieve related entries first, then answer with source-backed context.
+          </div>
+        </div>
+        <form class="ask-composer" id="ask-form">
+          <textarea class="ask-input" id="ask-input" rows="2" data-i18n-placeholder="ask.inputPlaceholder" placeholder="Ask the agent about your notes, pages, PDFs, and screenshots..."></textarea>
+          <div class="ask-actions">
+            <div class="ask-hint" data-i18n="ask.hint">Enter to send, Shift+Enter for a new line.</div>
+            <div class="ask-actions-right">
+              <button class="btn btn-secondary" id="ask-clear-btn" type="button" data-i18n="ask.buttonClear">Clear Chat</button>
+              <button class="btn btn-primary" id="ask-send-btn" type="submit" data-i18n="ask.buttonSend">Send</button>
+            </div>
+          </div>
+          <div class="ask-status" id="ask-status"></div>
+        </form>
+      </div>
+
+      <div id="graph" class="panel">
+        <div class="panel-title" data-i18n="graph.title">Knowledge Graph</div>
+        <div class="panel-desc" data-i18n="graph.description">Visual connections between keywords and documents.</div>
+        <svg id="graph-svg" width="100%"></svg>
+      </div>
+
+      <div id="settings" class="panel">
+        <div class="panel-title" data-i18n="settings.title">Settings</div>
+        <div class="panel-desc" data-i18n="settings.description">Configure the model used by Perch's AI agent and other LLM-powered tasks.</div>
+        <div class="settings-card">
+          <div class="settings-grid">
+            <div>
+              <label for="settings-api-base-url" data-i18n="settings.endpointLabel">Endpoint</label>
+              <input
+                id="settings-api-base-url"
+                class="settings-input"
+                type="text"
+                data-i18n-placeholder="settings.endpointPlaceholder"
+                placeholder="http://127.0.0.1:1234/v1"
+                spellcheck="false"
+                autocomplete="off"
+              >
+            </div>
+            <div>
+              <label for="settings-chat-model" data-i18n="settings.modelLabel">Model</label>
+              <div class="settings-model-row">
+                <input
+                  id="settings-chat-model"
+                  class="settings-input"
+                  type="text"
+                  data-i18n-placeholder="settings.modelPlaceholder"
+                  placeholder="qwen3.5-4b"
+                  spellcheck="false"
+                  autocomplete="off"
+                  list="settings-model-list"
+                >
+                <button class="btn btn-secondary settings-model-refresh" id="settings-refresh-models-btn" type="button" data-i18n="settings.buttonRefreshModels">Refresh Models</button>
+              </div>
+              <datalist id="settings-model-list"></datalist>
+            </div>
+            <div>
+              <label for="settings-embedding-model" data-i18n="settings.embeddingModelLabel">Embedding Model</label>
+              <input
+                id="settings-embedding-model"
+                class="settings-input"
+                type="text"
+                data-i18n-placeholder="settings.embeddingModelPlaceholder"
+                placeholder="text-embedding-nomic-embed-text-v1.5"
+                spellcheck="false"
+                autocomplete="off"
+              >
+            </div>
+            <div>
+              <label for="settings-language" data-i18n="settings.languageLabel">Language</label>
+              <select id="settings-language" class="settings-input">
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+                <option value="ja">日本語</option>
+              </select>
+            </div>
+            <div class="settings-help" data-i18n-html="settings.helpText">
+              The endpoint must be OpenAI-compatible. It is used for both <code>/chat/completions</code> and <code>/embeddings</code>. If you enter only host and port, the app will normalize it to a <code>/v1</code> base URL automatically.
+            </div>
+            <div class="settings-actions">
+              <button class="btn btn-primary" id="settings-save-btn" type="button" data-i18n="settings.buttonSave">Save Settings</button>
+              <div class="status" id="settings-status"></div>
+            </div>
+            <div class="settings-meta" id="settings-meta"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="i18n-init.js"></script>
+  <script src="kb-window.js"></script>
+</body>
+</html>

@@ -8,6 +8,20 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <div id="hover-card" class="hover-card hidden">
+    <div class="hover-kicker">Knowledge</div>
+    <div id="hover-keyword" class="hover-keyword"></div>
+    <div id="hover-summary" class="hover-summary"></div>
+    <div id="hover-entries" class="hover-entries"></div>
+  </div>
+  <div id="selection-menu" class="selection-menu hidden">
+    <button id="selection-action" class="selection-action" type="button">摘抄</button>
+  </div>
+  <div id="processing-toast" class="processing-toast hidden">
+    <div id="processing-toast-title" class="processing-toast-title">处理中</div>
+    <div id="processing-toast-message" class="processing-toast-message"></div>
+  </div>
+  <script src="overlay-i18n.js"></script>
   <script src="overlay.js"></script>
 </body>
 </html>
