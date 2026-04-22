@@ -1323,7 +1323,15 @@ export class KnowledgeStore {
         '--filename-conflict-action=overwrite'
       ];
 
-      execFile('npx', args, { timeout: 240000, maxBuffer: 32 * 1024 * 1024 }, (error, stdout, stderr) => {
+      execFile('npx', args, {
+        timeout: 240000,
+        maxBuffer: 32 * 1024 * 1024,
+        env: {
+          ...process.env,
+          npm_config_cache: path.join(DATA_DIR, 'npm-cache'),
+          HOME: require('os').homedir()
+        }
+      }, (error, stdout, stderr) => {
         if (error) {
           reject(new Error(`single-file snapshot failed for ${url}: ${(stderr || stdout || error.message).trim()}`));
           return;
