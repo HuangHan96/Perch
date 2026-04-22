@@ -17,7 +17,7 @@
 Perch uses native OCR to detect and underline keywords on your screen in real-time.
 
 <p align="center">
-  <img src="assets/demo-screen-analysis.svg" alt="Screen Analysis" width="640">
+  <img src="assets/demo-screen-analysis.gif" alt="Screen Analysis" width="640">
 </p>
 
 ### Double-tap Option — Open Knowledge Base
@@ -25,7 +25,7 @@ Perch uses native OCR to detect and underline keywords on your screen in real-ti
 Browse, search, and chat with everything you've captured.
 
 <p align="center">
-  <img src="assets/demo-knowledge-base.svg" alt="Knowledge Base" width="640">
+  <img src="assets/demo-knowledge-base.gif" alt="Knowledge Base" width="640">
 </p>
 
 ### Option + Drag — Capture Region
@@ -33,7 +33,7 @@ Browse, search, and chat with everything you've captured.
 Select any area on screen. Keywords and descriptions are extracted automatically.
 
 <p align="center">
-  <img src="assets/demo-screenshot-capture.svg" alt="Screen Capture" width="640">
+  <img src="assets/demo-screenshot-capture.gif" alt="Screen Capture" width="640">
 </p>
 
 ---
