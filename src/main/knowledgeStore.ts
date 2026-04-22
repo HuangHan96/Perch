@@ -1599,7 +1599,7 @@ export class KnowledgeStore {
 
   private getEmbedding(text: string): Promise<number[]> {
     return this.requestOpenAICompatible('POST', 'embeddings', {
-      model: LMSTUDIO_EMBED_MODEL,
+      model: this.settings.embeddingModel,
       input: text.slice(0, 2000)
     }).then((response) => {
       if (response?.data?.[0]?.embedding) {
