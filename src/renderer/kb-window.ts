@@ -88,6 +88,7 @@ type KbElectronAPI = {
   kbSearch: (query: string) => Promise<Entry[]>;
   kbListKeywords: () => Promise<Keyword[]>;
   kbUpdateKeyword: (oldKeyword: string, newKeyword: string, description: string) => Promise<void>;
+  kbDeleteKeyword: (keyword: string) => Promise<void>;
   kbGraphData: () => Promise<{ nodes: GraphNode[]; links: GraphLink[] }>;
   kbAgentChat: (messages: AskMessage[]) => Promise<AskResponse>;
   kbGetSettings: () => Promise<KbSettings>;
@@ -639,7 +640,10 @@ type KbWindowGlobal = Window & typeof globalThis & {
         <div class="keyword-meta">${keyword.doc_count} document${keyword.doc_count !== 1 ? 's' : ''} · updated ${keyword.updated_at}</div>
         ${keyword.description ? `<div class="keyword-desc">${escapeHtml(keyword.description)}</div>` : ''}
       </div>
-      <button class="btn btn-secondary keyword-edit-btn" data-keyword="${escapeHtmlAttribute(keyword.keyword)}" type="button">Edit</button>
+      <div class="keyword-actions">
+        <button class="btn btn-secondary keyword-edit-btn" data-keyword="${escapeHtmlAttribute(keyword.keyword)}" type="button">Edit</button>
+        <button class="btn btn-danger keyword-delete-btn" data-keyword="${escapeHtmlAttribute(keyword.keyword)}" type="button">Remove</button>
+      </div>
     </div>
   `).join('');
 
@@ -652,6 +656,20 @@ type KbWindowGlobal = Window & typeof globalThis & {
           if (keywordData) {
             showKeywordEditModal(keywordData);
           }
+        }
+      });
+    });
+
+    container.querySelectorAll('.keyword-delete-btn').forEach((button) => {
+      button.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        const keyword = (button as HTMLButtonElement).getAttribute('data-keyword');
+        if (!keyword) return;
+        try {
+          await electronAPI.kbDeleteKeyword(keyword);
+          await loadKeywordsTab();
+        } catch (error) {
+          console.error('Delete keyword failed:', error);
         }
       });
     });

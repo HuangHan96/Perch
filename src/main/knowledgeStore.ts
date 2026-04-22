@@ -486,6 +486,14 @@ export class KnowledgeStore {
     }
   }
 
+  deleteKeyword(keyword: string): void {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+
+    this.db.prepare('DELETE FROM entry_keywords WHERE keyword = ?').run(trimmed);
+    this.db.prepare('DELETE FROM keywords WHERE keyword = ?').run(trimmed);
+  }
+
   getAllKeywords(): string[] {
     // Only return keywords that have at least one linked document
     return (this.db.prepare(

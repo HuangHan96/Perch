@@ -296,6 +296,11 @@ async function createApp() {
     knowledgeStore.updateKeyword(oldKeyword, newKeyword, description);
   });
 
+  ipcMain.handle('kb-delete-keyword', async (_event, keyword: string) => {
+    knowledgeStore.deleteKeyword(keyword);
+    syncKeywords();
+  });
+
   ipcMain.handle('kb-graph-data', () => {
     return knowledgeStore.getGraphData();
   });
