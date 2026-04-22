@@ -10,11 +10,14 @@
 
 ![screenshot](assets/screenshot.png)
 
+
 ## How It Works
 
 ### Hold Option — Analyze Screen
 
 Perch uses native OCR to detect and underline keywords on your screen in real-time.
+
+![underline](assets/screenshot-2.png)
 
 <p align="center">
   <img src="assets/demo-screen-analysis.gif" alt="Screen Analysis" width="640">
