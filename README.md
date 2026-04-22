@@ -43,6 +43,24 @@ Select any area on screen. Keywords and descriptions are extracted automatically
 
 ## Quick Start
 
+### Download
+
+Download the latest release from [Releases](https://github.com/yourusername/Perch/releases).
+
+**macOS Security Note:** Since the app is not code-signed, macOS Gatekeeper will block it on first launch. To allow it:
+
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/Perch.app
+```
+
+Or if you downloaded the DMG:
+
+```bash
+sudo xattr -r -d com.apple.quarantine ~/Downloads/Perch-*.dmg
+```
+
+### Build from Source
+
 ```bash
 npm install
 npm run build
