@@ -8,7 +8,7 @@
   Intelligent screen capture and knowledge management for macOS.
 </p>
 
----
+![screenshot](assets/screenshot.png)
 
 ## How It Works
 
