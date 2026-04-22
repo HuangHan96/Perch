@@ -52,7 +52,12 @@
     "description": "Automatically extracted concepts from your documents.",
     "searchPlaceholder": "Search keywords...",
     "docCount": "{{count}} documents",
-    "empty": "No keywords found"
+    "empty": "No keywords found",
+    "editTitle": "Edit Keyword",
+    "nameLabel": "Name",
+    "descriptionLabel": "Description",
+    "buttonSave": "Save",
+    "buttonCancel": "Cancel"
   },
   "graph": {
     "title": "Knowledge Graph",

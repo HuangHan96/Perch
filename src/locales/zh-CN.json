@@ -52,7 +52,12 @@
     "description": "从你的文档中自动提取的概念。",
     "searchPlaceholder": "搜索关键词...",
     "docCount": "{{count}} 个文档",
-    "empty": "未找到关键词"
+    "empty": "未找到关键词",
+    "editTitle": "编辑关键词",
+    "nameLabel": "名称",
+    "descriptionLabel": "描述",
+    "buttonSave": "保存",
+    "buttonCancel": "取消"
   },
   "graph": {
     "title": "知识图谱",

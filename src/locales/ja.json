@@ -52,7 +52,12 @@
     "description": "ドキュメントから自動抽出された概念。",
     "searchPlaceholder": "キーワードを検索...",
     "docCount": "{{count}}件のドキュメント",
-    "empty": "キーワードが見つかりません"
+    "empty": "キーワードが見つかりません",
+    "editTitle": "キーワードを編集",
+    "nameLabel": "名前",
+    "descriptionLabel": "説明",
+    "buttonSave": "保存",
+    "buttonCancel": "キャンセル"
   },
   "graph": {
     "title": "ナレッジグラフ",

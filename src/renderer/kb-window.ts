@@ -87,6 +87,7 @@ type KbElectronAPI = {
   kbList: () => Promise<Entry[]>;
   kbSearch: (query: string) => Promise<Entry[]>;
   kbListKeywords: () => Promise<Keyword[]>;
+  kbUpdateKeyword: (oldKeyword: string, newKeyword: string, description: string) => Promise<void>;
   kbGraphData: () => Promise<{ nodes: GraphNode[]; links: GraphLink[] }>;
   kbAgentChat: (messages: AskMessage[]) => Promise<AskResponse>;
   kbGetSettings: () => Promise<KbSettings>;
@@ -632,12 +633,103 @@ type KbWindowGlobal = Window & typeof globalThis & {
     }
 
     container.innerHTML = keywords.map((keyword) => `
-    <div class="keyword-item">
-      <div class="keyword-name">${keyword.keyword}</div>
-      <div class="keyword-meta">${keyword.doc_count} document${keyword.doc_count !== 1 ? 's' : ''} · updated ${keyword.updated_at}</div>
-      ${keyword.description ? `<div class="keyword-desc">${keyword.description}</div>` : ''}
+    <div class="keyword-item" data-keyword="${escapeHtmlAttribute(keyword.keyword)}">
+      <div class="keyword-content">
+        <div class="keyword-name">${escapeHtml(keyword.keyword)}</div>
+        <div class="keyword-meta">${keyword.doc_count} document${keyword.doc_count !== 1 ? 's' : ''} · updated ${keyword.updated_at}</div>
+        ${keyword.description ? `<div class="keyword-desc">${escapeHtml(keyword.description)}</div>` : ''}
+      </div>
+      <button class="btn btn-secondary keyword-edit-btn" data-keyword="${escapeHtmlAttribute(keyword.keyword)}" type="button">Edit</button>
     </div>
   `).join('');
+
+    container.querySelectorAll('.keyword-edit-btn').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const keyword = (button as HTMLButtonElement).getAttribute('data-keyword');
+        if (keyword) {
+          const keywordData = keywords.find((k) => k.keyword === keyword);
+          if (keywordData) {
+            showKeywordEditModal(keywordData);
+          }
+        }
+      });
+    });
+  }
+
+  function showKeywordEditModal(keyword: Keyword) {
+    const existingModal = document.getElementById('keyword-edit-modal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'keyword-edit-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" data-i18n="keywords.editTitle">Edit Keyword</h2>
+          <button class="modal-close" type="button">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="keyword-edit-name" data-i18n="keywords.nameLabel">Name</label>
+            <input id="keyword-edit-name" class="settings-input" type="text" value="${escapeHtmlAttribute(keyword.keyword)}" />
+          </div>
+          <div class="form-group">
+            <label for="keyword-edit-desc" data-i18n="keywords.descriptionLabel">Description</label>
+            <textarea id="keyword-edit-desc" class="keyword-edit-textarea">${escapeHtml(keyword.description || '')}</textarea>
+          </div>
+          <div class="status" id="keyword-edit-status"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel-btn" type="button" data-i18n="keywords.buttonCancel">Cancel</button>
+          <button class="btn btn-primary modal-save-btn" type="button" data-i18n="keywords.buttonSave">Save</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('.modal-close')?.addEventListener('click', closeModal);
+    modal.querySelector('.modal-cancel-btn')?.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    modal.querySelector('.modal-save-btn')?.addEventListener('click', async () => {
+      await saveKeywordEdit(keyword.keyword);
+    });
+  }
+
+  async function saveKeywordEdit(oldKeyword: string) {
+    const nameInput = document.getElementById('keyword-edit-name') as HTMLInputElement;
+    const descInput = document.getElementById('keyword-edit-desc') as HTMLTextAreaElement;
+    const status = document.getElementById('keyword-edit-status') as HTMLDivElement;
+    const saveBtn = document.querySelector('.modal-save-btn') as HTMLButtonElement;
+
+    const newKeyword = nameInput.value.trim();
+    const newDescription = descInput.value.trim();
+
+    if (!newKeyword) {
+      setStatus(status, 'Keyword name cannot be empty', 'error');
+      return;
+    }
+
+    saveBtn.disabled = true;
+    setStatus(status, 'Saving...', 'processing');
+
+    try {
+      await electronAPI.kbUpdateKeyword(oldKeyword, newKeyword, newDescription);
+      setStatus(status, '✓ Saved', 'success');
+      setTimeout(() => {
+        document.getElementById('keyword-edit-modal')?.remove();
+        void loadKeywordsTab();
+      }, 500);
+    } catch (error) {
+      setStatus(status, 'Failed: ' + String((error as Error).message || error), 'error');
+      saveBtn.disabled = false;
+    }
   }
 
   async function submitAskQuestion() {

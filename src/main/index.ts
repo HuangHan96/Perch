@@ -292,6 +292,10 @@ async function createApp() {
     return knowledgeStore.getKeywordInfo(keyword);
   });
 
+  ipcMain.handle('kb-update-keyword', async (_event, oldKeyword: string, newKeyword: string, description: string) => {
+    knowledgeStore.updateKeyword(oldKeyword, newKeyword, description);
+  });
+
   ipcMain.handle('kb-graph-data', () => {
     return knowledgeStore.getGraphData();
   });

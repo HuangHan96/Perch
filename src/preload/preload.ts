@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   kbSearch: (query: string) => ipcRenderer.invoke('kb-search', query),
   kbListKeywords: () => ipcRenderer.invoke('kb-list-keywords'),
   kbGetKeyword: (keyword: string) => ipcRenderer.invoke('kb-get-keyword', keyword),
+  kbUpdateKeyword: (oldKeyword: string, newKeyword: string, description: string) => ipcRenderer.invoke('kb-update-keyword', oldKeyword, newKeyword, description),
   kbGraphData: () => ipcRenderer.invoke('kb-graph-data'),
   kbAgentChat: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) => ipcRenderer.invoke('kb-agent-chat', messages),
   kbGetSettings: () => ipcRenderer.invoke('kb-get-settings'),

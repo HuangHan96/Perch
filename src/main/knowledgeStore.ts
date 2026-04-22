@@ -459,6 +459,33 @@ export class KnowledgeStore {
     `).all() as KeywordInfo[];
   }
 
+  updateKeyword(oldKeyword: string, newKeyword: string, newDescription: string): void {
+    const trimmedOld = oldKeyword.trim();
+    const trimmedNew = newKeyword.trim();
+    const trimmedDesc = newDescription.trim();
+
+    if (!trimmedOld || !trimmedNew) {
+      throw new Error('Keyword name cannot be empty');
+    }
+
+    const now = this.formatTimestamp();
+
+    if (trimmedOld !== trimmedNew) {
+      const existing = this.db.prepare('SELECT keyword FROM keywords WHERE keyword = ?').get(trimmedNew);
+      if (existing) {
+        throw new Error('A keyword with this name already exists');
+      }
+
+      this.db.prepare('UPDATE keywords SET keyword = ?, description = ?, updated_at = ? WHERE keyword = ?')
+        .run(trimmedNew, trimmedDesc, now, trimmedOld);
+      this.db.prepare('UPDATE entry_keywords SET keyword = ? WHERE keyword = ?')
+        .run(trimmedNew, trimmedOld);
+    } else {
+      this.db.prepare('UPDATE keywords SET description = ?, updated_at = ? WHERE keyword = ?')
+        .run(trimmedDesc, now, trimmedOld);
+    }
+  }
+
   getAllKeywords(): string[] {
     // Only return keywords that have at least one linked document
     return (this.db.prepare(
