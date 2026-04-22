@@ -40,14 +40,17 @@
     "appId": "com.perch.app",
     "productName": "Perch",
     "files": [
-      "dist/**/*",
-      "build/Release/**/*",
-      "node_modules/**/*",
-      "package.json"
+      "dist/main/**/*",
+      "dist/renderer/**/*",
+      "dist/preload/**/*",
+      "dist/locales/**/*",
+      "package.json",
+      "!dist/mac-arm64/**/*",
+      "!dist/Perch-*",
+      "!dist/builder-*"
     ],
     "asarUnpack": [
-      "build/Release/*.node",
-      "node_modules/**/*.node"
+      "**/*.node"
     ],
     "extraResources": [
       {
