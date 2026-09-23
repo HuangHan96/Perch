@@ -22,6 +22,9 @@ interface ElectronAPI {
   onHideSelectionRegion: (callback: () => void) => void;
   onShowProcessingToast: (callback: (payload: { title?: string; message: string; tone?: 'processing' | 'success' | 'error' }) => void) => void;
   onHideProcessingToast: (callback: () => void) => void;
+  onCaptureScreenFrame: (callback: (requestId: number) => void) => void;
+  sendScreenFrame: (requestId: number, pixels: ArrayBuffer | null, width: number, height: number, pixelFormat: string) => void;
+  reportScreenStreamStatus: (status: 'ready' | 'failed', detail?: string) => void;
   saveSelectedText: (content: string) => Promise<unknown>;
   setMouseRegion: (hasHoverRegion: boolean) => void;
   getKnowledgeData: (keyword: string) => Promise<{
@@ -85,6 +88,79 @@ if (document.readyState === 'loading') {
 } else {
   initOverlayI18n();
 }
+
+/**
+ * The main process analyses the screen continuously, and starting a fresh capture session for
+ * every frame costs ~300ms. Instead we keep one display stream alive here and hand out frames
+ * of it on request (~20ms each).
+ */
+let streamVideo: HTMLVideoElement | null = null;
+let frameCanvas: HTMLCanvasElement | null = null;
+
+function reportStreamStatus(status: 'ready' | 'failed', detail?: string) {
+  const electronAPI = (window as any).electronAPI as ElectronAPI | undefined;
+  electronAPI?.reportScreenStreamStatus(status, detail);
+}
+
+async function startScreenStream() {
+  try {
+    const electronAPI = (window as any).electronAPI as ElectronAPI;
+
+    // Ask for the display at point size (one stream pixel per screen point), which is the
+    // geometry every coordinate in the capture pipeline assumes. Without the size hint the
+    // stream comes back at native resolution (2x on Retina), which is 4x the pixels to copy
+    // and to recognise.
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: window.innerWidth, height: window.innerHeight, frameRate: 30 },
+      audio: false
+    });
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.style.position = 'fixed';
+    video.style.left = '-10000px';
+    video.style.width = '1px';
+    video.style.height = '1px';
+    document.body.appendChild(video);
+
+    video.srcObject = stream;
+    await video.play();
+    await new Promise<void>((resolve) => {
+      const check = () => (video.videoWidth > 0 ? resolve() : requestAnimationFrame(check));
+      check();
+    });
+
+    streamVideo = video;
+    reportStreamStatus('ready');
+    console.log(`✓ Screen stream ready: ${video.videoWidth}x${video.videoHeight}`);
+
+    electronAPI.onCaptureScreenFrame((requestId) => {
+      const currentVideo = streamVideo;
+      if (!currentVideo || currentVideo.videoWidth === 0) {
+        electronAPI.sendScreenFrame(requestId, null, 0, 0, 'rgba');
+        return;
+      }
+
+      if (!frameCanvas || frameCanvas.width !== currentVideo.videoWidth || frameCanvas.height !== currentVideo.videoHeight) {
+        frameCanvas = document.createElement('canvas');
+        frameCanvas.width = currentVideo.videoWidth;
+        frameCanvas.height = currentVideo.videoHeight;
+      }
+
+      const frameContext = frameCanvas.getContext('2d', { willReadFrequently: true })!;
+      frameContext.drawImage(currentVideo, 0, 0);
+      const image = frameContext.getImageData(0, 0, frameCanvas.width, frameCanvas.height);
+      electronAPI.sendScreenFrame(requestId, image.data.buffer, frameCanvas.width, frameCanvas.height, 'rgba');
+    });
+  } catch (error) {
+    console.warn('⚠ Screen stream unavailable, falling back to per-frame capture:', error);
+    reportStreamStatus('failed', String(error));
+  }
+}
+
+startScreenStream();
 
 function resizeCanvas() {
   const width = window.innerWidth;

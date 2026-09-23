@@ -125,6 +125,11 @@ Electron · TypeScript · macOS Vision API · SQLite
 
 Everything runs locally. Your data never leaves your machine unless you point the API endpoint to a remote server.
 
+Perch keeps one screen-capture stream open (in the always-on-top overlay window) so that holding
+Option can analyze the screen in a few hundred milliseconds instead of starting a capture session
+every time. macOS therefore shows its screen-recording indicator while Perch is running. The stream
+never leaves the machine, and the overlay itself is excluded from it.
+
 ## License
 
 MIT

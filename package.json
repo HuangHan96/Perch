@@ -4,6 +4,7 @@
   "description": "Perch - Intelligent screen capture and knowledge management",
   "main": "dist/main/index.js",
   "scripts": {
+    "postinstall": "electron-builder install-app-deps",
     "build": "tsc && tsc -p src/renderer/tsconfig.json && mkdir -p dist/renderer dist/locales && cp src/renderer/*.html src/renderer/*.css dist/renderer/ && cp src/locales/*.json dist/locales/ && node-gyp rebuild",
     "dev": "concurrently \"tsc -w\" \"electron-reload . && electron .\"",
     "start": "electron .",
@@ -33,7 +34,6 @@
     "d3": "^7.9.0",
     "node-addon-api": "^8.0.0",
     "pdf-parse": "^2.4.5",
-    "sharp": "^0.33.0",
     "uiohook-napi": "^1.5.5"
   },
   "build": {

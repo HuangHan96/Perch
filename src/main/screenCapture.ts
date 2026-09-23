@@ -1,14 +1,40 @@
-import { clipboard, desktopCapturer, screen } from 'electron';
-import sharp from 'sharp';
+import { clipboard, nativeImage, screen } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { loadNativeModule } from './nativeLoader';
+import type { UnderlinePosition } from './overlayManager';
 
 export interface ChangedRegion {
   x: number;
   y: number;
   width: number;
   height: number;
+}
+
+/**
+ * A captured screen frame: tightly packed 8-bit-per-channel pixels, one pixel per screen point.
+ * `pixelFormat` says which order the colour channels are in, so the OCR module can build the
+ * right image for the buffer it is given.
+ */
+export interface CapturedFrame {
+  bitmap: Buffer;
+  width: number;
+  height: number;
+  pixelFormat: 'bgra' | 'rgba';
+}
+
+/** Where ScreenCapture gets its frames from (see screenFrameSource.ts). */
+export interface ScreenFrameProvider {
+  grabFrame(): Promise<CapturedFrame | null>;
+  isLowLatency?(): boolean;
+}
+
+type DisplayBounds = { width: number; height: number; menuBarHeight: number };
+
+interface PrewarmedAnalysis {
+  frame: CapturedFrame;
+  pressId: number;
+  fastMatches?: UnderlinePosition[];
 }
 
 export interface SelectionClipboardContent {
@@ -28,23 +54,29 @@ export class ScreenCapture {
   private captureInterval: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
   private optionKeyTimer: NodeJS.Timeout | null = null;
-  private lastScreenHash: string = '';
-  private lastImageBuffer: Buffer | null = null;
+  private lastFrame: CapturedFrame | null = null;
+  private prewarmedAnalysis: PrewarmedAnalysis | null = null;
+  private prewarmPromise: Promise<void> | null = null;
+  private optionPressId: number = 0;
   private nativeModule: any = null;
+  private frameProvider: ScreenFrameProvider | null = null;
+  private speculativeAnalysisProvider: ((frame: CapturedFrame, displayBounds: DisplayBounds) => Promise<UnderlinePosition[]>) | null = null;
   private uiohook: any = null;
   private isOptionKeyPressed: boolean = false;
   private optionPressStartedAt: number | null = null;
   private lastOptionTapAt: number | null = null;
+  private previousPressWasHold: boolean = false;
   private optionHoldTriggeredForCurrentPress: boolean = false;
   private selectionCheckInFlight: boolean = false;
   private selectionCheckedThisPress: boolean = false;
   isActive: boolean = false; // Public so index.ts can check
   private callback: (
-    imageBuffer: Buffer,
-    displayBounds: { width: number; height: number; menuBarHeight: number },
-    windowBounds: { x: number; y: number; width: number; height: number } | null,
-    changedRegions?: ChangedRegion[],
-    ocrRegion?: ChangedRegion | null
+    frame: CapturedFrame,
+    displayBounds: DisplayBounds,
+    changedRegions: ChangedRegion[],
+    ocrRegion: ChangedRegion | null,
+    isInitialCapture: boolean,
+    prewarmedFastMatches?: UnderlinePosition[]
   ) => Promise<void>;
   private onCaptureModeActiveChangeCallback: ((isActive: boolean) => void) | null = null;
   private onClearCallback: (() => void) | null = null;
@@ -62,11 +94,12 @@ export class ScreenCapture {
 
   constructor(
     callback: (
-      imageBuffer: Buffer,
-      displayBounds: { width: number; height: number; menuBarHeight: number },
-      windowBounds: { x: number; y: number; width: number; height: number } | null,
-      changedRegions?: ChangedRegion[],
-      ocrRegion?: ChangedRegion | null
+      frame: CapturedFrame,
+      displayBounds: DisplayBounds,
+      changedRegions: ChangedRegion[],
+      ocrRegion: ChangedRegion | null,
+      isInitialCapture: boolean,
+      prewarmedFastMatches?: UnderlinePosition[]
     ) => Promise<void>,
     onCaptureModeActiveChange?: (isActive: boolean) => void,
     onClear?: () => void,
@@ -103,6 +136,16 @@ export class ScreenCapture {
     this.setupGlobalEventListeners();
   }
 
+  setFrameProvider(provider: ScreenFrameProvider) {
+    this.frameProvider = provider;
+  }
+
+  setSpeculativeAnalysisProvider(
+    provider: (frame: CapturedFrame, displayBounds: DisplayBounds) => Promise<UnderlinePosition[]>
+  ) {
+    this.speculativeAnalysisProvider = provider;
+  }
+
   stop() {
     if (this.captureInterval) {
       clearInterval(this.captureInterval);
@@ -129,6 +172,7 @@ export class ScreenCapture {
           if (!this.isOptionKeyPressed) {
             this.isOptionKeyPressed = true;
             this.optionPressStartedAt = Date.now();
+            this.optionPressId += 1;
             this.optionHoldTriggeredForCurrentPress = false;
             this.selectionCheckedThisPress = false;
             console.log(`✓ Option key pressed, starting analysis in ${ScreenCapture.OPTION_HOLD_DELAY_MS}ms if held...`);
@@ -137,6 +181,8 @@ export class ScreenCapture {
             if (this.onOptionKeyPressCallback) {
               this.onOptionKeyPressCallback();
             }
+
+            this.startPrewarmCapture();
 
             this.optionKeyTimer = setTimeout(() => {
               if (this.isOptionKeyPressed) {
@@ -162,8 +208,10 @@ export class ScreenCapture {
 
           this.isOptionKeyPressed = false;
           this.optionPressStartedAt = null;
+          this.previousPressWasHold = this.optionHoldTriggeredForCurrentPress;
           this.optionHoldTriggeredForCurrentPress = false;
           this.selectionCheckedThisPress = false;
+          this.prewarmedAnalysis = null;
           this.clearMouseSelectionState();
 
           if (this.optionKeyTimer) {
@@ -248,6 +296,83 @@ export class ScreenCapture {
     } catch (error) {
       console.warn('⚠ Could not start global event listeners:', error);
     }
+  }
+
+  /**
+   * Captures the screen, and when possible runs the fast preview while the hold gesture is
+   * still being decided. A result is only ever consumed by the press that started it.
+   */
+  private startPrewarmCapture() {
+    if (this.prewarmPromise || this.isProcessing) {
+      return;
+    }
+
+    // A live stream makes this work non-blocking for tap gestures. If the stream is not ready,
+    // retain the old conservative rule so a tap never starts a ~300ms getSources capture.
+    const streamIsReady = this.frameProvider?.isLowLatency?.() === true;
+    if (!this.previousPressWasHold && !streamIsReady) {
+      return;
+    }
+
+    // A press that may turn out to be the second tap of a double-tap should not pay for a capture.
+    const timeSinceLastTap =
+      this.lastOptionTapAt === null ? Number.POSITIVE_INFINITY : Date.now() - this.lastOptionTapAt;
+    if (timeSinceLastTap <= ScreenCapture.OPTION_DOUBLE_PRESS_WINDOW_MS) {
+      return;
+    }
+
+    const pressId = this.optionPressId;
+    console.log('→ Prewarming screen capture for the current Option press...');
+
+    this.prewarmPromise = this.grabFrame()
+      .then(async (frame) => {
+        if (!frame) return;
+
+        let fastMatches: UnderlinePosition[] | undefined;
+        if (this.speculativeAnalysisProvider) {
+          try {
+            fastMatches = await this.speculativeAnalysisProvider(frame, this.getDisplayBounds());
+          } catch (error) {
+            console.warn('⚠ Speculative OCR failed; the initial capture will retry:', error);
+          }
+        }
+
+        if (this.isOptionKeyPressed && this.optionPressId === pressId) {
+          this.prewarmedAnalysis = { frame, pressId, fastMatches };
+          console.log(`✓ Prewarmed frame ready${fastMatches ? ` with ${fastMatches.length} fast matches` : ''}`);
+        }
+      })
+      .catch((error) => {
+        console.warn('⚠ Prewarm capture failed:', error);
+      })
+      .finally(() => {
+        this.prewarmPromise = null;
+      });
+  }
+
+  /** Takes the speculative frame and preview result for the current press. */
+  private async takePrewarmedAnalysis(): Promise<PrewarmedAnalysis | null> {
+    if (this.prewarmPromise) {
+      await this.prewarmPromise;
+    }
+
+    const prewarmed = this.prewarmedAnalysis;
+    this.prewarmedAnalysis = null;
+
+    if (!prewarmed || prewarmed.pressId !== this.optionPressId) {
+      return null;
+    }
+
+    return prewarmed;
+  }
+
+  private getDisplayBounds(): DisplayBounds {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    return {
+      width: primaryDisplay.bounds.width,
+      height: primaryDisplay.bounds.height,
+      menuBarHeight: primaryDisplay.workArea.y
+    };
   }
 
   private handleOptionTap(releasedAt: number) {
@@ -527,8 +652,7 @@ export class ScreenCapture {
     if (this.onCaptureModeActiveChangeCallback) {
       this.onCaptureModeActiveChangeCallback(true);
     }
-    this.lastScreenHash = '';
-    this.lastImageBuffer = null;
+    this.lastFrame = null;
     console.log('✓ Starting continuous capture...');
 
     // First capture: always run OCR regardless of change
@@ -563,8 +687,7 @@ export class ScreenCapture {
       this.onClearCallback();
     }
 
-    this.lastScreenHash = '';
-    this.lastImageBuffer = null;
+    this.lastFrame = null;
   }
 
   private async captureScreen(forceOCR: boolean = false) {
@@ -580,106 +703,103 @@ export class ScreenCapture {
       const { width, height } = primaryDisplay.bounds;
       const menuBarHeight = primaryDisplay.workArea.y;
 
-      const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: { width, height }
-      });
+      // The first frame of a press usually comes from the speculative capture started on keydown.
+      const prewarmedAnalysis = forceOCR ? await this.takePrewarmedAnalysis() : null;
+      let frame = prewarmedAnalysis?.frame || null;
+      const usedPrewarm = frame !== null;
+      if (!frame) {
+        frame = await this.grabFrame();
+      }
 
       if (!this.isActive) return;
 
-      if (sources.length === 0) {
+      if (!frame) {
         console.error('No screen sources available');
         return;
       }
 
-      const source = sources[0];
-      const thumbnail = source.thumbnail;
-      const imageBuffer = thumbnail.toPNG();
-      const thumbnailSize = thumbnail.getSize();
+      console.log(`✓ Captured screen: ${frame.width}x${frame.height}, ${frame.bitmap.length} bytes${usedPrewarm ? ' (prewarmed)' : ''}`);
 
-      console.log(`✓ Captured screen: ${thumbnailSize.width}x${thumbnailSize.height}, ${imageBuffer.length} bytes`);
-
-      const currentHash = await this.computeHash(imageBuffer);
-
-      if (!this.isActive) return;
-
-      if (forceOCR || currentHash !== this.lastScreenHash) {
-        let changedRegions: ChangedRegion[] = [];
-        let ocrBuffer = imageBuffer;
-        let ocrRegion: ChangedRegion | null = null;
-
-        if (!forceOCR && this.lastImageBuffer) {
-          changedRegions = await this.detectChangedRegions(
-            this.lastImageBuffer,
-            imageBuffer,
-            thumbnailSize.width,
-            thumbnailSize.height
-          );
+      const previous = this.lastFrame;
+      let changedRegions: ChangedRegion[] | null = null;
+      if (!forceOCR && previous) {
+        changedRegions = this.detectChangedRegions(previous, frame);
+        if (changedRegions === null) {
+          console.log('✓ Frame size changed, running OCR on the full frame');
+        } else {
           console.log(`✓ Found ${changedRegions.length} changed regions`);
-
-          if (changedRegions.length > 0 && changedRegions.length < 50) {
-            // Merge changed regions into a single bounding rect
-            let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
-            for (const r of changedRegions) {
-              minX = Math.min(minX, r.x);
-              minY = Math.min(minY, r.y);
-              maxX = Math.max(maxX, r.x + r.width);
-              maxY = Math.max(maxY, r.y + r.height);
-            }
-
-            // Add padding around the changed area for context
-            const padding = 50;
-            minX = Math.max(0, minX - padding);
-            minY = Math.max(0, minY - padding);
-            maxX = Math.min(thumbnailSize.width, maxX + padding);
-            maxY = Math.min(thumbnailSize.height, maxY + padding);
-
-            ocrRegion = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-
-            // Crop the image to the changed region
-            try {
-              ocrBuffer = await sharp(imageBuffer)
-                .extract({ left: minX, top: minY, width: ocrRegion.width, height: ocrRegion.height })
-                .toBuffer();
-              console.log(`✓ Cropped to changed region: ${ocrRegion.width}x${ocrRegion.height} at (${minX},${minY})`);
-            } catch (e) {
-              // Fallback to full image
-              ocrBuffer = imageBuffer;
-              ocrRegion = null;
-            }
-          }
-          // else: too many changed regions, just OCR the full image
-        } else {
-          console.log('✓ Force OCR on first capture...');
         }
+      } else {
+        console.log('✓ Force OCR on first capture...');
+      }
 
-        this.lastImageBuffer = imageBuffer;
+      // A frame is only worth OCRing when this is the first capture of a press, the frame size
+      // changed, or pixels actually moved. Nothing else can change what gets underlined.
+      const shouldRunOcr = forceOCR || changedRegions === null || changedRegions.length > 0;
+      if (!shouldRunOcr) {
+        return;
+      }
 
-        if (this.debounceTimer) {
-          clearTimeout(this.debounceTimer);
+      let ocrFrame = frame;
+      let ocrRegion: ChangedRegion | null = null;
+      if (changedRegions && changedRegions.length > 0 && changedRegions.length < 50) {
+        ocrRegion = this.mergeChangedRegions(changedRegions, frame.width, frame.height);
+
+        // OCR only the changed area: crop the pixels the native module will read.
+        try {
+          ocrFrame = this.cropFrame(frame, ocrRegion);
+          console.log(`✓ Cropped to changed region: ${ocrRegion.width}x${ocrRegion.height} at (${ocrRegion.x},${ocrRegion.y})`);
+        } catch (e) {
+          // Fallback to full frame
+          ocrFrame = frame;
+          ocrRegion = null;
         }
+      }
+      // else: too many changed regions, just OCR the full frame
 
-        const capturedWindowBounds = null;
-        if (debounceMs === 0) {
-          // No debounce for first capture
+      this.lastFrame = frame;
+
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+      }
+
+      if (debounceMs === 0) {
+        // No debounce for first capture
+        if (!this.isActive) return;
+        console.log('→ Starting OCR (immediate)...');
+        await this.callback(
+          ocrFrame,
+          { width, height, menuBarHeight },
+          changedRegions ?? [],
+          ocrRegion,
+          true,
+          prewarmedAnalysis?.fastMatches
+        );
+      } else {
+        this.debounceTimer = setTimeout(async () => {
           if (!this.isActive) return;
-          console.log('→ Starting OCR (immediate)...');
-          await this.callback(ocrBuffer, { width, height, menuBarHeight }, capturedWindowBounds, changedRegions, ocrRegion);
-        } else {
-          this.debounceTimer = setTimeout(async () => {
-            if (!this.isActive) return;
-            console.log('→ Starting OCR...');
-            await this.callback(ocrBuffer, { width, height, menuBarHeight }, capturedWindowBounds, changedRegions, ocrRegion);
-          }, debounceMs);
-        }
-
-        this.lastScreenHash = currentHash;
+          console.log('→ Starting OCR...');
+          await this.callback(ocrFrame, { width, height, menuBarHeight }, changedRegions ?? [], ocrRegion, false);
+        }, debounceMs);
       }
     } catch (error) {
       console.error('Screen capture error:', error);
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  /**
+   * Grabs the primary display as a raw bitmap through the configured frame provider.
+   * One pixel in the returned frame maps to one point on screen.
+   */
+  private async grabFrame(): Promise<CapturedFrame | null> {
+    if (!this.frameProvider) {
+      console.error('No screen frame provider configured');
+      return null;
+    }
+
+    return this.frameProvider.grabFrame();
   }
 
   private clearMouseSelectionState() {
@@ -715,70 +835,41 @@ export class ScreenCapture {
   }
 
   private async captureSelectionRegion(region: ChangedRegion): Promise<Buffer | null> {
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.bounds;
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width, height }
-    });
-
-    if (sources.length === 0) {
+    const frame = await this.grabFrame();
+    if (!frame) {
       return null;
     }
 
-    const source = sources[0];
-    const thumbnail = source.thumbnail;
-    const thumbnailSize = thumbnail.getSize();
-    const left = Math.max(0, Math.min(region.x, thumbnailSize.width - 1));
-    const top = Math.max(0, Math.min(region.y, thumbnailSize.height - 1));
-    const normalizedRegion = {
-      left,
-      top,
-      width: Math.max(1, Math.min(region.width, thumbnailSize.width - left)),
-      height: Math.max(1, Math.min(region.height, thumbnailSize.height - top))
-    };
+    const cropped = this.cropFrame(frame, region);
 
-    return await sharp(thumbnail.toPNG())
-      .extract(normalizedRegion)
-      .png()
-      .toBuffer();
-  }
-
-  private async computeHash(imageBuffer: Buffer): Promise<string> {
-    try {
-      const { data, info } = await sharp(imageBuffer)
-        .resize(16, 16, { fit: 'fill' })
-        .greyscale()
-        .raw()
-        .toBuffer({ resolveWithObject: true });
-
-      let sum = 0;
-      for (let i = 0; i < data.length; i++) {
-        sum += data[i];
+    // nativeImage expects BGRA, while a frame from the display stream is RGBA.
+    if (cropped.pixelFormat === 'rgba') {
+      const pixels = cropped.bitmap;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const red = pixels[i];
+        pixels[i] = pixels[i + 2];
+        pixels[i + 2] = red;
       }
-      const avg = sum / data.length;
-
-      let hash = '';
-      for (let i = 0; i < data.length; i++) {
-        hash += data[i] > avg ? '1' : '0';
-      }
-
-      return hash;
-    } catch (error) {
-      console.error('Hash computation error:', error);
-      return '';
     }
+
+    const image = nativeImage.createFromBitmap(cropped.bitmap, { width: cropped.width, height: cropped.height });
+    return image.toPNG();
   }
 
-  private async detectChangedRegions(
-    oldBuffer: Buffer,
-    newBuffer: Buffer,
-    width: number,
-    height: number
-  ): Promise<ChangedRegion[]> {
+  /**
+   * Compares two frames block by block and returns the blocks whose pixels moved.
+   * Returns null when the frames cannot be compared because their size changed.
+   */
+  private detectChangedRegions(previous: CapturedFrame, current: CapturedFrame): ChangedRegion[] | null {
+    if (previous.width !== current.width || previous.height !== current.height) {
+      return null;
+    }
+
     try {
-      const oldData = await sharp(oldBuffer).raw().toBuffer();
-      const newData = await sharp(newBuffer).raw().toBuffer();
+      const width = current.width;
+      const height = current.height;
+      const oldData = previous.bitmap;
+      const newData = current.bitmap;
 
       // Use horizontal blocks for text-oriented detection
       const blockWidth = 300;  // Wide blocks for horizontal text
@@ -804,17 +895,15 @@ export class ScreenCapture {
             for (let x = blockX; x < blockX + blockW; x += 4) {
               const idx = (y * width + x) * 4;
 
-              if (idx + 2 < oldData.length && idx + 2 < newData.length) {
-                const rDiff = Math.abs(oldData[idx] - newData[idx]);
-                const gDiff = Math.abs(oldData[idx + 1] - newData[idx + 1]);
-                const bDiff = Math.abs(oldData[idx + 2] - newData[idx + 2]);
-                const diff = (rDiff + gDiff + bDiff) / 3;
+              const rDiff = Math.abs(oldData[idx] - newData[idx]);
+              const gDiff = Math.abs(oldData[idx + 1] - newData[idx + 1]);
+              const bDiff = Math.abs(oldData[idx + 2] - newData[idx + 2]);
+              const diff = (rDiff + gDiff + bDiff) / 3;
 
-                if (diff > threshold) {
-                  changedPixels++;
-                }
-                totalPixels++;
+              if (diff > threshold) {
+                changedPixels++;
               }
+              totalPixels++;
             }
           }
 
@@ -835,4 +924,42 @@ export class ScreenCapture {
       return [];
     }
   }
+
+  /** Merges changed blocks into one padded bounding rect, clamped to the frame. */
+  private mergeChangedRegions(regions: ChangedRegion[], width: number, height: number): ChangedRegion {
+    let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+    for (const region of regions) {
+      minX = Math.min(minX, region.x);
+      minY = Math.min(minY, region.y);
+      maxX = Math.max(maxX, region.x + region.width);
+      maxY = Math.max(maxY, region.y + region.height);
+    }
+
+    // Add padding around the changed area for context
+    const padding = 50;
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(width, maxX + padding);
+    maxY = Math.min(height, maxY + padding);
+
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+  }
+
+  /** Copies a region out of a frame, row by row. */
+  private cropFrame(frame: CapturedFrame, region: ChangedRegion): CapturedFrame {
+    const left = Math.max(0, Math.min(Math.round(region.x), frame.width - 1));
+    const top = Math.max(0, Math.min(Math.round(region.y), frame.height - 1));
+    const width = Math.max(1, Math.min(Math.round(region.width), frame.width - left));
+    const height = Math.max(1, Math.min(Math.round(region.height), frame.height - top));
+
+    const bitmap = Buffer.allocUnsafe(width * height * 4);
+    const rowBytes = width * 4;
+    for (let y = 0; y < height; y++) {
+      const rowStart = ((top + y) * frame.width + left) * 4;
+      frame.bitmap.copy(bitmap, y * rowBytes, rowStart, rowStart + rowBytes);
+    }
+
+    return { bitmap, width, height, pixelFormat: frame.pixelFormat };
+  }
 }
+

@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, ipcMain } from 'electron';
+import { BrowserWindow, screen, ipcMain, WebContents } from 'electron';
 import * as path from 'path';
 
 export interface UnderlinePosition {
@@ -146,6 +146,11 @@ export class OverlayManager {
 
   isSelectionMenuShown() {
     return this.selectionMenuVisible;
+  }
+
+  /** The overlay renderer, which owns the live display stream used for frame capture. */
+  getRenderer(): WebContents | null {
+    return this.overlayWindow && !this.overlayWindow.isDestroyed() ? this.overlayWindow.webContents : null;
   }
 
   showSelectionRegion(region: SelectionRegion) {

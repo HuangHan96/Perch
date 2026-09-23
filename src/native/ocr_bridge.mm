@@ -6,36 +6,80 @@
 #import <unistd.h>
 #import <napi.h>
 
-// Helper function to perform OCR using Vision API
-NSArray* performOCROnImage(NSData* imageData, NSArray* keywords) {
-    NSMutableArray* results = [NSMutableArray array];
+#include <string>
+#include <vector>
+
+// Builds a CGImage over tightly packed 8-bit-per-channel rows, the layout produced by
+// Electron's NativeImage.toBitmap() (BGRA) or by a canvas ImageData read (RGBA).
+// No pixel copy is made: the caller owns the data and must keep it alive while the image is used.
+CGImageRef createRawImage(const uint8_t* data, size_t width, size_t height, bool bgra) {
+    if (!data || width == 0 || height == 0) {
+        return NULL;
+    }
+
+    CGDataProviderRef provider = CGDataProviderCreateWithData(NULL, (void*)data, width * height * 4, NULL);
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    CGImageRef image = CGImageCreate(
+        width,
+        height,
+        8,
+        32,
+        width * 4,
+        colorSpace,
+        bgra ? (kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst)
+             : (kCGBitmapByteOrder32Big | kCGImageAlphaPremultipliedLast),
+        provider,
+        NULL,
+        false,
+        kCGRenderingIntentDefault
+    );
+    CGColorSpaceRelease(colorSpace);
+    CGDataProviderRelease(provider);
+    return image;
+}
+
+// A keyword match, in plain C++ so results can safely outlive the autorelease pool
+// they were produced in.
+struct OCRMatch {
+    std::string text;
+    std::string keyword;
+    double x = 0;
+    double y = 0;
+    double width = 0;
+    double height = 0;
+};
+
+// How a recognition request should be configured. The live capture path tunes these for
+// latency (fast level for the preview pass, pinned languages to skip language detection).
+struct OCROptions {
+    VNRequestTextRecognitionLevel level = VNRequestTextRecognitionLevelAccurate;
+    bool automaticallyDetectsLanguage = true;
+    bool bgra = true;
+    NSArray* languages = nil;
+};
+
+// Runs Vision on an already decoded image and collects keyword matches.
+std::vector<OCRMatch> matchKeywordsInImage(CGImageRef cgImage, NSArray* keywords, const OCROptions& options) {
+    std::vector<OCRMatch> results;
 
     @autoreleasepool {
-        // Create CGImage from data
-        NSImage* image = [[NSImage alloc] initWithData:imageData];
-        if (!image) {
-            return results;
-        }
-
-        CGImageRef cgImage = [image CGImageForProposedRect:NULL context:NULL hints:NULL];
         if (!cgImage) {
             return results;
         }
 
-        // Create Vision request with optimized settings for speed
         VNRecognizeTextRequest* request = [[VNRecognizeTextRequest alloc] init];
-        request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
+        request.recognitionLevel = options.level;
         request.usesLanguageCorrection = NO;
         request.minimumTextHeight = 0.0;
 
-        // Set recognition languages (English + common languages)
-        if (@available(macOS 11.0, *)) {
-            request.recognitionLanguages = @[@"en-US"];
+        if (options.languages.count > 0) {
+            if (@available(macOS 11.0, *)) {
+                request.recognitionLanguages = options.languages;
+            }
         }
 
-        // Use automatic language detection
         if (@available(macOS 13.0, *)) {
-            request.automaticallyDetectsLanguage = YES;
+            request.automaticallyDetectsLanguage = options.automaticallyDetectsLanguage;
         }
 
         // Create request handler
@@ -94,16 +138,14 @@ NSArray* performOCROnImage(NSData* imageData, NSArray* keywords) {
 
                         // Vision coordinates: (0,0) at bottom-left, normalized 0-1
                         // Convert to top-left origin for screen coordinates
-                        NSDictionary* result = @{
-                            @"text": [text substringWithRange:foundRange],
-                            @"keyword": keyword,
-                            @"x": @(boundingBox.origin.x),
-                            @"y": @(1.0 - boundingBox.origin.y - boundingBox.size.height),
-                            @"width": @(boundingBox.size.width),
-                            @"height": @(boundingBox.size.height)
-                        };
-
-                        [results addObject:result];
+                        results.push_back({
+                            [text substringWithRange:foundRange].UTF8String,
+                            keyword.UTF8String,
+                            boundingBox.origin.x,
+                            1.0 - boundingBox.origin.y - boundingBox.size.height,
+                            boundingBox.size.width,
+                            boundingBox.size.height
+                        });
 
                         // Move search range past this match
                         searchRange.location = foundRange.location + foundRange.length;
@@ -135,16 +177,14 @@ NSArray* performOCROnImage(NSData* imageData, NSArray* keywords) {
                                 boundingBox = observation.boundingBox;
                             }
 
-                            NSDictionary* result = @{
-                                @"text": [text substringWithRange:foundRange],
-                                @"keyword": keyword,
-                                @"x": @(boundingBox.origin.x),
-                                @"y": @(1.0 - boundingBox.origin.y - boundingBox.size.height),
-                                @"width": @(boundingBox.size.width),
-                                @"height": @(boundingBox.size.height)
-                            };
-
-                            [results addObject:result];
+                            results.push_back({
+                                [text substringWithRange:foundRange].UTF8String,
+                                keyword.UTF8String,
+                                boundingBox.origin.x,
+                                1.0 - boundingBox.origin.y - boundingBox.size.height,
+                                boundingBox.size.width,
+                                boundingBox.size.height
+                            });
                         }
                     }
                 }
@@ -153,6 +193,48 @@ NSArray* performOCROnImage(NSData* imageData, NSArray* keywords) {
     }
 
     return results;
+}
+
+// Helper function to perform OCR on an encoded image (PNG/JPEG) using the Vision API
+std::vector<OCRMatch> performOCROnImage(NSData* imageData, NSArray* keywords) {
+    @autoreleasepool {
+        NSImage* image = [[NSImage alloc] initWithData:imageData];
+        if (!image) {
+            return {};
+        }
+
+        CGImageRef cgImage = [image CGImageForProposedRect:NULL context:NULL hints:NULL];
+        if (!cgImage) {
+            return {};
+        }
+
+        // Imported images and PDFs are not latency sensitive, so they keep language detection
+        // and the accurate level.
+        OCROptions options;
+        options.level = VNRequestTextRecognitionLevelAccurate;
+        options.automaticallyDetectsLanguage = true;
+        options.languages = @[@"en-US"];
+        return matchKeywordsInImage(cgImage, keywords, options);
+    }
+}
+
+// Copies keyword matches into a JS array of {text, keyword, x, y, width, height}.
+Napi::Array matchesToJsArray(Napi::Env env, const std::vector<OCRMatch>& matches) {
+    Napi::Array jsResults = Napi::Array::New(env, matches.size());
+
+    for (size_t i = 0; i < matches.size(); i++) {
+        const OCRMatch& match = matches[i];
+        Napi::Object jsResult = Napi::Object::New(env);
+        jsResult.Set("text", Napi::String::New(env, match.text));
+        jsResult.Set("keyword", Napi::String::New(env, match.keyword));
+        jsResult.Set("x", Napi::Number::New(env, match.x));
+        jsResult.Set("y", Napi::Number::New(env, match.y));
+        jsResult.Set("width", Napi::Number::New(env, match.width));
+        jsResult.Set("height", Napi::Number::New(env, match.height));
+        jsResults[i] = jsResult;
+    }
+
+    return jsResults;
 }
 
 // N-API wrapper
@@ -167,38 +249,142 @@ public:
     }
 
     void Execute() override {
-        results = [performOCROnImage(imageData, keywords) retain];
+        results = performOCROnImage(imageData, keywords);
     }
 
     void OnOK() override {
         Napi::HandleScope scope(Env());
-        Napi::Array jsResults = Napi::Array::New(Env());
-
-        for (NSUInteger i = 0; i < [results count]; i++) {
-            NSDictionary* result = results[i];
-            Napi::Object jsResult = Napi::Object::New(Env());
-
-            NSString* text = result[@"text"];
-            NSString* keyword = result[@"keyword"];
-            jsResult.Set("text", Napi::String::New(Env(), [text UTF8String]));
-            jsResult.Set("keyword", Napi::String::New(Env(), [keyword UTF8String]));
-            jsResult.Set("x", Napi::Number::New(Env(), [result[@"x"] doubleValue]));
-            jsResult.Set("y", Napi::Number::New(Env(), [result[@"y"] doubleValue]));
-            jsResult.Set("width", Napi::Number::New(Env(), [result[@"width"] doubleValue]));
-            jsResult.Set("height", Napi::Number::New(Env(), [result[@"height"] doubleValue]));
-
-            jsResults[i] = jsResult;
-        }
-
-        Callback().Call({Env().Null(), jsResults});
-        [results release];
+        Callback().Call({Env().Null(), matchesToJsArray(Env(), results)});
     }
 
 private:
     NSData* imageData;
     NSArray* keywords;
-    NSArray* results;
+    std::vector<OCRMatch> results;
 };
+
+// Raw bitmap variant: takes the pixels straight from the screen capture, so the capture
+// path never has to encode (and Vision never has to decode) an image.
+class PerformOCRBitmapWorker : public Napi::AsyncWorker {
+public:
+    PerformOCRBitmapWorker(
+        Napi::Function& callback,
+        Napi::Buffer<uint8_t> bitmap,
+        size_t width,
+        size_t height,
+        NSArray* keywords,
+        const OCROptions& options
+    )
+        : Napi::AsyncWorker(callback), width(width), height(height), keywords([keywords retain]), options(options) {
+        if (options.languages) {
+            this->options.languages = [options.languages retain];
+        }
+        // The worker thread outlives the JS call, so own a copy of the pixels.
+        size_t byteLength = width * height * 4;
+        bitmapData = (uint8_t*)malloc(byteLength);
+        memcpy(bitmapData, bitmap.Data(), byteLength);
+    }
+
+    ~PerformOCRBitmapWorker() {
+        free(bitmapData);
+        [keywords release];
+        if (options.languages) {
+            [options.languages release];
+        }
+    }
+
+    void Execute() override {
+        @autoreleasepool {
+            CGImageRef image = createRawImage(bitmapData, width, height, options.bgra);
+            results = matchKeywordsInImage(image, keywords, options);
+            if (image) {
+                CGImageRelease(image);
+            }
+        }
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        Callback().Call({Env().Null(), matchesToJsArray(Env(), results)});
+    }
+
+private:
+    uint8_t* bitmapData;
+    size_t width;
+    size_t height;
+    NSArray* keywords;
+    OCROptions options;
+    std::vector<OCRMatch> results;
+};
+
+Napi::Value PerformOCRBitmap(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    if (info.Length() < 6 || !info[0].IsBuffer() || !info[1].IsNumber() || !info[2].IsNumber()
+        || !info[3].IsArray() || !info[4].IsObject() || !info[5].IsFunction()) {
+        Napi::TypeError::New(env, "Expected (bitmap: Buffer, width: number, height: number, keywords: Array, options: object, callback: Function)")
+            .ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    Napi::Buffer<uint8_t> bitmap = info[0].As<Napi::Buffer<uint8_t>>();
+    size_t width = (size_t)info[1].As<Napi::Number>().Int64Value();
+    size_t height = (size_t)info[2].As<Napi::Number>().Int64Value();
+    Napi::Array keywordsArray = info[3].As<Napi::Array>();
+    Napi::Object optionsObject = info[4].As<Napi::Object>();
+    Napi::Function callback = info[5].As<Napi::Function>();
+
+    if (width == 0 || height == 0 || bitmap.Length() < width * height * 4) {
+        Napi::TypeError::New(env, "Bitmap buffer is smaller than width * height * 4 bytes").ThrowAsJavaScriptException();
+        return env.Null();
+    }
+
+    NSMutableArray* keywords = [NSMutableArray array];
+    for (uint32_t i = 0; i < keywordsArray.Length(); i++) {
+        Napi::Value val = keywordsArray[i];
+        if (val.IsString()) {
+            std::string keyword = val.As<Napi::String>().Utf8Value();
+            if (!keyword.empty()) {
+                [keywords addObject:[NSString stringWithUTF8String:keyword.c_str()]];
+            }
+        }
+    }
+
+    OCROptions options;
+    options.level = VNRequestTextRecognitionLevelAccurate;
+    options.automaticallyDetectsLanguage = true;
+    options.bgra = true;
+
+    if (optionsObject.Has("level") && optionsObject.Get("level").IsString()) {
+        std::string level = optionsObject.Get("level").As<Napi::String>().Utf8Value();
+        options.level = (level == "fast") ? VNRequestTextRecognitionLevelFast : VNRequestTextRecognitionLevelAccurate;
+    }
+    if (optionsObject.Has("pixelFormat") && optionsObject.Get("pixelFormat").IsString()) {
+        std::string format = optionsObject.Get("pixelFormat").As<Napi::String>().Utf8Value();
+        options.bgra = (format != "rgba");
+    }
+    if (optionsObject.Has("automaticallyDetectsLanguage") && optionsObject.Get("automaticallyDetectsLanguage").IsBoolean()) {
+        options.automaticallyDetectsLanguage = optionsObject.Get("automaticallyDetectsLanguage").As<Napi::Boolean>().Value();
+    }
+    if (optionsObject.Has("languages") && optionsObject.Get("languages").IsArray()) {
+        Napi::Array languagesArray = optionsObject.Get("languages").As<Napi::Array>();
+        NSMutableArray* languages = [NSMutableArray array];
+        for (uint32_t i = 0; i < languagesArray.Length(); i++) {
+            Napi::Value val = languagesArray[i];
+            if (val.IsString()) {
+                std::string language = val.As<Napi::String>().Utf8Value();
+                if (!language.empty()) {
+                    [languages addObject:[NSString stringWithUTF8String:language.c_str()]];
+                }
+            }
+        }
+        options.languages = languages;
+    }
+
+    PerformOCRBitmapWorker* worker = new PerformOCRBitmapWorker(callback, bitmap, width, height, keywords, options);
+    worker->Queue();
+    return env.Undefined();
+}
 
 Napi::Value PerformOCR(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -431,6 +617,7 @@ Napi::Value ActivateAppByBundleId(const Napi::CallbackInfo& info) {
 
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("performOCR", Napi::Function::New(env, PerformOCR));
+    exports.Set("performOCRBitmap", Napi::Function::New(env, PerformOCRBitmap));
     exports.Set("getFrontWindowBounds", Napi::Function::New(env, GetFrontWindowBounds));
     exports.Set("getFrontWindowContext", Napi::Function::New(env, GetFrontWindowContext));
     exports.Set("simulateCopyShortcut", Napi::Function::New(env, SimulateCopyShortcut));

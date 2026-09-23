@@ -25,6 +25,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onHideProcessingToast: (callback: () => void) => {
     ipcRenderer.on('hide-processing-toast', () => callback());
   },
+  onCaptureScreenFrame: (callback: (requestId: number) => void) => {
+    ipcRenderer.on('capture-screen-frame', (_event, requestId: number) => callback(requestId));
+  },
+  sendScreenFrame: (requestId: number, pixels: ArrayBuffer | null, width: number, height: number, pixelFormat: string) => {
+    ipcRenderer.send('screen-frame-result', requestId, pixels, width, height, pixelFormat);
+  },
+  reportScreenStreamStatus: (status: 'ready' | 'failed', detail?: string) => {
+    ipcRenderer.send('screen-stream-status', status, detail);
+  },
   setMouseRegion: (hasHoverRegion: boolean) => {
     ipcRenderer.send('set-mouse-region', hasHoverRegion);
   },

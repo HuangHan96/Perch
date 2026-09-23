@@ -2,8 +2,9 @@ import { app, BrowserWindow, desktopCapturer, ipcMain, screen, Tray, Menu, nativ
 import * as path from 'path';
 import * as fs from 'fs';
 import { execFile } from 'child_process';
-import { ScreenCapture, ChangedRegion, SelectionClipboardContent } from './screenCapture';
-import { OverlayManager, SelectionRegion } from './overlayManager';
+import { ScreenCapture, CapturedFrame, ChangedRegion, SelectionClipboardContent } from './screenCapture';
+import { ScreenFrameSource } from './screenFrameSource';
+import { OverlayManager, SelectionRegion, UnderlinePosition } from './overlayManager';
 import { OCRManager } from './ocrManager';
 import { MatchManager } from './matchManager';
 import { KnowledgeStore, SourceContext, AskAgentMessage } from './knowledgeStore';
@@ -14,6 +15,7 @@ import { loadNativeModule } from './nativeLoader';
 import './logger';
 
 let screenCapture: ScreenCapture;
+let screenFrameSource: ScreenFrameSource;
 let overlayManager: OverlayManager;
 let ocrManager: OCRManager;
 let matchManager: MatchManager;
@@ -21,6 +23,7 @@ let knowledgeStore: KnowledgeStore;
 let kbWindowManager: KnowledgeWindowManager;
 let tray: Tray | null = null;
 let updateDebounceTimer: NodeJS.Timeout | null = null;
+let underlinesOnScreen = false;
 let pendingSelectionSourceContext: SourceContext | null = null;
 let pendingSelectionClipboardContent: SelectionClipboardContent | null = null;
 const UPDATE_DEBOUNCE_MS = 100;
@@ -53,6 +56,13 @@ async function createApp() {
 
   overlayManager = new OverlayManager();
   overlayManager.createWindow();
+
+  // Frames come from a live display stream held by the overlay renderer (~20ms per frame)
+  // instead of a fresh capture session per frame (~300ms).
+  screenFrameSource = new ScreenFrameSource();
+  screenFrameSource.registerIpcHandlers();
+  screenFrameSource.setUpDisplayMediaHandler();
+  screenFrameSource.attachRenderer(overlayManager.getRenderer());
 
   ocrManager = new OCRManager();
   matchManager = new MatchManager();
@@ -336,44 +346,86 @@ async function createApp() {
 
   screenCapture = new ScreenCapture(
     async (
-      imageBuffer: Buffer,
+      frame: CapturedFrame,
       displayBounds: { width: number; height: number; menuBarHeight: number },
-      windowBounds: { x: number; y: number; width: number; height: number } | null,
-      changedRegions?: ChangedRegion[],
-      ocrRegion?: ChangedRegion | null
+      changedRegions: ChangedRegion[],
+      ocrRegion: ChangedRegion | null,
+      isInitialCapture: boolean,
+      prewarmedFastMatches?: UnderlinePosition[]
     ) => {
       try {
-        const matches = await ocrManager.findKeywordMatches(imageBuffer, displayBounds, windowBounds, ocrRegion);
-
-        if (!screenCapture.isActive) return;
-
-        console.log(`→ Main: Got ${matches.length} matches from OCR`);
-
-        if (changedRegions && changedRegions.length > 0) {
-          matchManager.removeMatchesInRegions(changedRegions);
-        }
-
-        for (const match of matches) {
-          matchManager.addMatches([match], match.keyword || 'Unknown');
-        }
-
-        if (updateDebounceTimer) {
-          clearTimeout(updateDebounceTimer);
-        }
-
-        updateDebounceTimer = setTimeout(() => {
+        const applyMatches = (matches: UnderlinePosition[]) => {
           if (!screenCapture.isActive) return;
 
-          const allMatches = matchManager.getAllMatches();
-          const stats = matchManager.getStats();
-          console.log(`→ Overlay update: ${allMatches.length} unique matches`, stats);
-
-          if (allMatches.length > 0) {
-            overlayManager.drawUnderlines(allMatches);
-          } else {
-            overlayManager.clearUnderlines();
+          if (changedRegions.length > 0) {
+            matchManager.removeMatchesInRegions(changedRegions);
           }
-        }, UPDATE_DEBOUNCE_MS);
+
+          for (const match of matches) {
+            matchManager.addMatches([match], match.keyword || 'Unknown');
+          }
+
+          const drawMatches = () => {
+            if (!screenCapture.isActive) return;
+
+            const allMatches = matchManager.getAllMatches();
+            const stats = matchManager.getStats();
+            console.log(`→ Overlay update: ${allMatches.length} unique matches`, stats);
+
+            if (allMatches.length > 0) {
+              overlayManager.drawUnderlines(allMatches);
+              underlinesOnScreen = true;
+            } else {
+              overlayManager.clearUnderlines();
+              underlinesOnScreen = false;
+            }
+          };
+
+          if (updateDebounceTimer) {
+            clearTimeout(updateDebounceTimer);
+            updateDebounceTimer = null;
+          }
+
+          if (!underlinesOnScreen) {
+            // Nothing is on screen yet, so there is nothing to coalesce: draw right away.
+            drawMatches();
+          } else {
+            updateDebounceTimer = setTimeout(() => {
+              updateDebounceTimer = null;
+              drawMatches();
+            }, UPDATE_DEBOUNCE_MS);
+          }
+        };
+
+        if (isInitialCapture) {
+          // The first frame of a press is the one the user is waiting for, so draw a fast pass
+          // right away and let the accurate pass replace it a moment later. On dense screens the
+          // accurate pass alone takes far longer than the fast one.
+          const previewMatches = prewarmedFastMatches !== undefined
+            ? prewarmedFastMatches
+            : await ocrManager.findKeywordMatches(frame, displayBounds, ocrRegion, 'fast');
+          if (prewarmedFastMatches !== undefined) {
+            console.log(`→ Main: using ${previewMatches.length} prewarmed fast matches`);
+          }
+          console.log(`→ Main: got ${previewMatches.length} matches from the fast pass`);
+          applyMatches(previewMatches);
+
+          const preciseMatches = await ocrManager.findKeywordMatches(frame, displayBounds, ocrRegion, 'accurate');
+          console.log(`→ Main: got ${preciseMatches.length} matches from the accurate pass`);
+
+          if (!screenCapture.isActive) return;
+
+          // The accurate pass covers the same frame, so it replaces the preview outright.
+          matchManager.clear();
+          for (const match of preciseMatches) {
+            matchManager.addMatches([match], match.keyword || 'Unknown');
+          }
+          applyMatches([]);
+        } else {
+          const matches = await ocrManager.findKeywordMatches(frame, displayBounds, ocrRegion, 'accurate');
+          console.log(`→ Main: Got ${matches.length} matches from OCR`);
+          applyMatches(matches);
+        }
       } catch (error) {
         console.error('OCR error:', error);
       }
@@ -389,6 +441,7 @@ async function createApp() {
       matchManager.clear();
       overlayManager.clearUnderlines();
       overlayManager.hideSelectionRegion();
+      underlinesOnScreen = false;
       console.log('✓ Cleared all matches');
     },
     (selection: SelectionClipboardContent) => {
@@ -443,6 +496,10 @@ async function createApp() {
     }
   );
 
+  screenCapture.setFrameProvider(screenFrameSource);
+  screenCapture.setSpeculativeAnalysisProvider((frame, displayBounds) => (
+    ocrManager.findKeywordMatches(frame, displayBounds, null, 'fast')
+  ));
   screenCapture.start();
 
   console.log('Perch started. Hold Option to analyze screen, or double-tap Option to open the knowledge base.');
